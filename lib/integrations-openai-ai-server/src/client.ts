@@ -1,18 +1,24 @@
 import OpenAI from "openai";
 
-if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
+const hasReplitProxy =
+  process.env.AI_INTEGRATIONS_OPENAI_BASE_URL &&
+  process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+
+const hasDirectKey = !!process.env.OPENAI_API_KEY;
+
+if (!hasReplitProxy && !hasDirectKey) {
   throw new Error(
-    "AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?",
+    "No OpenAI credentials found. Set OPENAI_API_KEY or provision the Replit OpenAI AI integration.",
   );
 }
 
-if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-  throw new Error(
-    "AI_INTEGRATIONS_OPENAI_API_KEY must be set. Did you forget to provision the OpenAI AI integration?",
-  );
-}
-
-export const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+export const openai = new OpenAI(
+  hasReplitProxy
+    ? {
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      }
+    : {
+        apiKey: process.env.OPENAI_API_KEY,
+      },
+);
