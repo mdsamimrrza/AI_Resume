@@ -134,11 +134,24 @@ export function parseResume(text: string): ParsedLine[] {
   const rawLines = normalized.split("\n");
   let firstNonEmpty = true;
 
-  return rawLines.map((line) => {
+  const parsedLines: ParsedLine[] = [];
+  
+  for (const line of rawLines) {
     const t = line.trim();
-    if (!t) return { type: "blank", text: "" };
-    const parsed = { type: classifyResumeLine(t, firstNonEmpty), text: t };
+    if (!t) {
+      parsedLines.push({ type: "blank", text: "" });
+      continue;
+    }
+    const type = classifyResumeLine(t, firstNonEmpty);
     if (firstNonEmpty) firstNonEmpty = false;
-    return parsed;
-  });
+    
+    // Group consecutive meta lines into a single line joined by |
+    if (type === "meta" && parsedLines.length > 0 && parsedLines[parsedLines.length - 1].type === "meta") {
+      parsedLines[parsedLines.length - 1].text += ` | ${t}`;
+    } else {
+      parsedLines.push({ type, text: t });
+    }
+  }
+
+  return parsedLines;
 }
