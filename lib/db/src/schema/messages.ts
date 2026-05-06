@@ -1,23 +1,21 @@
-import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-import { conversations } from "./conversations";
-
-export const messages = pgTable("messages", {
-  id: serial("id").primaryKey(),
-  conversationId: integer("conversation_id")
-    .notNull()
-    .references(() => conversations.id, { onDelete: "cascade" }),
-  role: text("role").notNull(),
-  content: text("content").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+const messageSchema = new mongoose.Schema({
+  conversationId: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", required: true },
+  role: { type: String, required: true },
+  content: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  createdAt: true,
+export const MessageModel = mongoose.model("Message", messageSchema);
+export const messages = MessageModel;
+
+export const insertMessageSchema = z.object({
+  conversationId: z.string(),
+  role: z.string(),
+  content: z.string(),
 });
 
-export type Message = typeof messages.$inferSelect;
+export type Message = mongoose.InferSchemaType<typeof messageSchema> & { _id: mongoose.Types.ObjectId };
 export type InsertMessage = z.infer<typeof insertMessageSchema>;

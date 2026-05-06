@@ -1,0 +1,15 @@
+# Ignore large/sensitive files from Vercel deployments
+.env
+node_modules
+resumelift.tar.gz
+attached_assets
+*.tar.gz
+*.zip
+
+# Dev artifacts
+backend/dist
+frontend/dist
+lib/*/dist
+
+# Local dev only
+dev.mjs

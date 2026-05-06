@@ -1,17 +1,18 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-export const conversations = pgTable("conversations", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+const conversationSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertConversationSchema = createInsertSchema(conversations).omit({
-  id: true,
-  createdAt: true,
+export const ConversationModel = mongoose.model("Conversation", conversationSchema);
+export const conversationsTable = ConversationModel;
+export const conversations = ConversationModel; // Add another alias for consistency
+
+export const insertConversationSchema = z.object({
+  title: z.string(),
 });
 
-export type Conversation = typeof conversations.$inferSelect;
+export type Conversation = mongoose.InferSchemaType<typeof conversationSchema> & { _id: mongoose.Types.ObjectId };
 export type InsertConversation = z.infer<typeof insertConversationSchema>;

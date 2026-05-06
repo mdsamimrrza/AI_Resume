@@ -1,30 +1,23 @@
-import {
-  pgTable,
-  text,
-  serial,
-  timestamp,
-  integer,
-  real,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
-import { resumesTable } from "./resumes";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-export const resumeVersionsTable = pgTable("resume_versions", {
-  id: serial("id").primaryKey(),
-  resumeId: integer("resume_id")
-    .notNull()
-    .references(() => resumesTable.id, { onDelete: "cascade" }),
-  versionNumber: integer("version_number").notNull().default(1),
-  content: text("content").notNull(),
-  score: real("score"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+const resumeVersionSchema = new mongoose.Schema({
+  resumeId: { type: mongoose.Schema.Types.ObjectId, ref: "Resume", required: true },
+  versionNumber: { type: Number, default: 1 },
+  content: { type: String, required: true },
+  score: Number,
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertResumeVersionSchema = createInsertSchema(
-  resumeVersionsTable
-).omit({ id: true, createdAt: true });
+export const ResumeVersionModel = mongoose.model("ResumeVersion", resumeVersionSchema);
+export const resumeVersionsTable = ResumeVersionModel;
+
+export const insertResumeVersionSchema = z.object({
+  resumeId: z.string(),
+  versionNumber: z.number().optional(),
+  content: z.string(),
+  score: z.number().optional(),
+});
+
 export type InsertResumeVersion = z.infer<typeof insertResumeVersionSchema>;
-export type ResumeVersion = typeof resumeVersionsTable.$inferSelect;
+export type ResumeVersion = mongoose.InferSchemaType<typeof resumeVersionSchema> & { _id: mongoose.Types.ObjectId };

@@ -1,26 +1,22 @@
-import {
-  pgTable,
-  text,
-  serial,
-  integer,
-  real,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
-import { resumesTable } from "./resumes";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-export const extractedSkillsTable = pgTable("extracted_skills", {
-  id: serial("id").primaryKey(),
-  resumeId: integer("resume_id")
-    .notNull()
-    .references(() => resumesTable.id, { onDelete: "cascade" }),
-  skillName: text("skill_name").notNull(),
-  category: text("category").notNull(),
-  confidenceScore: real("confidence_score").notNull().default(0.8),
+const extractedSkillSchema = new mongoose.Schema({
+  resumeId: { type: mongoose.Schema.Types.ObjectId, ref: "Resume", required: true },
+  skillName: { type: String, required: true },
+  category: { type: String, required: true },
+  confidenceScore: { type: Number, default: 0.8 },
 });
 
-export const insertExtractedSkillSchema = createInsertSchema(
-  extractedSkillsTable
-).omit({ id: true });
+export const ExtractedSkillModel = mongoose.model("ExtractedSkill", extractedSkillSchema);
+export const extractedSkillsTable = ExtractedSkillModel;
+
+export const insertExtractedSkillSchema = z.object({
+  resumeId: z.string(),
+  skillName: z.string(),
+  category: z.string(),
+  confidenceScore: z.number().optional(),
+});
+
 export type InsertExtractedSkill = z.infer<typeof insertExtractedSkillSchema>;
-export type ExtractedSkill = typeof extractedSkillsTable.$inferSelect;
+export type ExtractedSkill = mongoose.InferSchemaType<typeof extractedSkillSchema> & { _id: mongoose.Types.ObjectId };

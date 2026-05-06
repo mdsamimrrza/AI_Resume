@@ -29,7 +29,7 @@ export const UploadResumeBody = zod.object({
  * @summary List all resumes
  */
 export const ListResumesResponseItem = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   userId: zod.string().nullish(),
   rawText: zod.string(),
   fileUrl: zod.string().nullish(),
@@ -47,11 +47,11 @@ export const ListResumesResponse = zod.array(ListResumesResponseItem);
  * @summary Get a resume by ID
  */
 export const GetResumeParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetResumeResponse = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   userId: zod.string().nullish(),
   rawText: zod.string(),
   fileUrl: zod.string().nullish(),
@@ -68,11 +68,11 @@ export const GetResumeResponse = zod.object({
  * @summary Get current pipeline status for a resume
  */
 export const GetResumeStatusParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetResumeStatusResponse = zod.object({
-  resumeId: zod.number(),
+  resumeId: zod.string(),
   stage: zod.string(),
   stages: zod.array(
     zod.object({
@@ -88,14 +88,14 @@ export const GetResumeStatusResponse = zod.object({
  * @summary Get extracted skills and experience
  */
 export const GetExtractionParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetExtractionResponse = zod.object({
-  resumeId: zod.number(),
+  resumeId: zod.string(),
   skills: zod.array(
     zod.object({
-      id: zod.number(),
+      id: zod.string(),
       skillName: zod.string(),
       category: zod.string(),
       confidenceScore: zod.number(),
@@ -111,11 +111,11 @@ export const GetExtractionResponse = zod.object({
  * @summary Get skill gaps
  */
 export const GetGapsParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetGapsResponseItem = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   missingSkill: zod.string(),
   importanceLevel: zod.string(),
   suggestion: zod.string().nullish(),
@@ -126,12 +126,12 @@ export const GetGapsResponse = zod.array(GetGapsResponseItem);
  * @summary Get improvement suggestions
  */
 export const GetSuggestionsParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetSuggestionsResponseItem = zod.object({
-  id: zod.number(),
-  gapId: zod.number(),
+  id: zod.string(),
+  gapId: zod.string(),
   missingSkill: zod.string(),
   importanceLevel: zod.string(),
   bullets: zod.array(zod.string()),
@@ -143,11 +143,11 @@ export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
  * @summary Get the rewritten resume
  */
 export const GetRewriteParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetRewriteResponse = zod.object({
-  resumeId: zod.number(),
+  resumeId: zod.string(),
   originalText: zod.string(),
   rewrittenText: zod.string(),
   versionNumber: zod.number(),
@@ -157,11 +157,11 @@ export const GetRewriteResponse = zod.object({
  * @summary Get before/after diff
  */
 export const GetDiffParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetDiffResponse = zod.object({
-  resumeId: zod.number(),
+  resumeId: zod.string(),
   originalText: zod.string(),
   rewrittenText: zod.string(),
   changeCount: zod.number(),
@@ -177,11 +177,11 @@ export const GetDiffResponse = zod.object({
  * @summary Get ATS validation results
  */
 export const GetValidationParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetValidationResponse = zod.object({
-  resumeId: zod.number(),
+  resumeId: zod.string(),
   atsScore: zod.number(),
   keywordScore: zod.number(),
   formattingScore: zod.number(),
@@ -199,11 +199,11 @@ export const GetValidationResponse = zod.object({
  * @summary Trigger a new pipeline run
  */
 export const IterateResumeParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const IterateResumeResponse = zod.object({
-  id: zod.number(),
+  id: zod.string(),
   userId: zod.string().nullish(),
   rawText: zod.string(),
   fileUrl: zod.string().nullish(),
@@ -220,12 +220,12 @@ export const IterateResumeResponse = zod.object({
  * @summary Get all versions of a resume
  */
 export const GetVersionsParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetVersionsResponseItem = zod.object({
-  id: zod.number(),
-  resumeId: zod.number(),
+  id: zod.string(),
+  resumeId: zod.string(),
   versionNumber: zod.number(),
   content: zod.string(),
   score: zod.number().nullish(),
@@ -237,11 +237,11 @@ export const GetVersionsResponse = zod.array(GetVersionsResponseItem);
  * @summary Get overall resume-to-job match score
  */
 export const GetMatchScoreParams = zod.object({
-  id: zod.coerce.number(),
+  id: zod.string(),
 });
 
 export const GetMatchScoreResponse = zod.object({
-  resumeId: zod.number(),
+  resumeId: zod.string(),
   score: zod.number(),
   label: zod.string(),
 });

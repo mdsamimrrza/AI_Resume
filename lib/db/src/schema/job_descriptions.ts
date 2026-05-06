@@ -1,20 +1,23 @@
-import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-export const jobDescriptionsTable = pgTable("job_descriptions", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  company: text("company").notNull(),
-  rawText: text("raw_text").notNull(),
-  requiredSkills: jsonb("required_skills"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+const jobDescriptionSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  company: { type: String, required: true },
+  rawText: { type: String, required: true },
+  requiredSkills: mongoose.Schema.Types.Mixed,
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertJobDescriptionSchema = createInsertSchema(
-  jobDescriptionsTable
-).omit({ id: true, createdAt: true });
+export const JobDescriptionModel = mongoose.model("JobDescription", jobDescriptionSchema);
+export const jobDescriptionsTable = JobDescriptionModel;
+
+export const insertJobDescriptionSchema = z.object({
+  title: z.string(),
+  company: z.string(),
+  rawText: z.string(),
+  requiredSkills: z.any().optional(),
+});
+
 export type InsertJobDescription = z.infer<typeof insertJobDescriptionSchema>;
-export type JobDescription = typeof jobDescriptionsTable.$inferSelect;
+export type JobDescription = mongoose.InferSchemaType<typeof jobDescriptionSchema> & { _id: mongoose.Types.ObjectId };

@@ -1,34 +1,35 @@
-import {
-  pgTable,
-  text,
-  serial,
-  timestamp,
-  integer,
-  real,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import mongoose from "mongoose";
+import { z } from "zod";
 
-export const resumesTable = pgTable("resumes", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id"),
-  rawText: text("raw_text").notNull(),
-  fileUrl: text("file_url"),
-  iteration: integer("iteration").notNull().default(1),
-  pipelineStage: text("pipeline_stage").notNull().default("pending"),
-  matchScore: real("match_score"),
-  jobDescription: text("job_description"),
-  jobTitle: text("job_title"),
-  company: text("company"),
-  portfolioUrl: text("portfolio_url"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+const resumeSchema = new mongoose.Schema({
+  userId: String,
+  rawText: { type: String, required: true },
+  fileUrl: String,
+  iteration: { type: Number, default: 1 },
+  pipelineStage: { type: String, default: "pending" },
+  matchScore: Number,
+  jobDescription: String,
+  jobTitle: String,
+  company: String,
+  portfolioUrl: String,
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertResumeSchema = createInsertSchema(resumesTable).omit({
-  id: true,
-  createdAt: true,
+export const ResumeModel = mongoose.model("Resume", resumeSchema);
+export const resumesTable = ResumeModel; // Keep alias for easier refactoring
+
+export const insertResumeSchema = z.object({
+  userId: z.string().optional(),
+  rawText: z.string(),
+  fileUrl: z.string().optional(),
+  iteration: z.number().optional(),
+  pipelineStage: z.string().optional(),
+  matchScore: z.number().optional(),
+  jobDescription: z.string().optional(),
+  jobTitle: z.string().optional(),
+  company: z.string().optional(),
+  portfolioUrl: z.string().optional(),
 });
+
 export type InsertResume = z.infer<typeof insertResumeSchema>;
-export type Resume = typeof resumesTable.$inferSelect;
+export type Resume = mongoose.InferSchemaType<typeof resumeSchema> & { _id: mongoose.Types.ObjectId };
