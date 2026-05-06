@@ -13,6 +13,12 @@ const resumeSchema = new mongoose.Schema({
   company: String,
   portfolioUrl: String,
   createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+resumeSchema.pre("save", function(next) {
+  this.updatedAt = new Date();
+  next();
 });
 
 export const ResumeModel = mongoose.model("Resume", resumeSchema);

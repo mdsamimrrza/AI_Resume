@@ -22,7 +22,7 @@ export default function Analyzer() {
       enabled: !!resumeId,
       queryKey: getGetResumeStatusQueryKey((resumeId as any) ?? ""),
       refetchInterval: (query) => {
-        return query.state.data?.stage !== "complete" ? 1000 : false;
+        return query.state.data?.stage !== "complete" ? 3000 : false;
       },
     },
   });

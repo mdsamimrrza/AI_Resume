@@ -27,6 +27,9 @@ import {
 } from "@workspace/db";
 
 const router: IRouter = Router();
+
+// In-memory lock to prevent parallel pipeline runs in the same process
+const activePipelines = new Set<string>();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Helper to map Mongoose documents to API response format
@@ -153,11 +156,12 @@ router.get("/resume/:id/status", async (req, res): Promise<void> => {
 
   // Drive the pipeline forward on each poll (Serverless-safe)
   if (resume.pipelineStage !== "complete" && resume.pipelineStage !== "error") {
-    // We don't await the whole thing here, we just trigger the next stage
-    // and return the current status immediately.
-    runPipeline(resume._id.toString()).catch(err => {
-      console.error("Poll-triggered pipeline error:", err);
-    });
+    if (!activePipelines.has(resume._id.toString())) {
+      activePipelines.add(resume._id.toString());
+      runPipeline(resume._id.toString())
+        .catch(err => console.error("Poll-triggered pipeline error:", err))
+        .finally(() => activePipelines.delete(resume._id.toString()));
+    }
   }
 
   const stageOrder = [
@@ -286,7 +290,7 @@ router.get("/resume/:id/rewrite", async (req, res): Promise<void> => {
     .sort({ versionNumber: -1 });
 
   if (!latestVersion) {
-    res.status(404).json({ error: "No rewrite available yet" });
+    res.json({ content: "" });
     return;
   }
 
