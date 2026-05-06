@@ -16,7 +16,7 @@ async function updateStage(resumeId: string, stage: string) {
   await ResumeModel.findByIdAndUpdate(resumeId, { pipelineStage: stage });
 }
 
-export async function runPipeline(resumeId: string): Promise<void> {
+export async function runPipeline(resumeId: string, stopAtStage?: string): Promise<void> {
   try {
     const resume = await ResumeModel.findById(resumeId);
 
@@ -25,116 +25,133 @@ export async function runPipeline(resumeId: string): Promise<void> {
       return;
     }
 
+    const currentStage = resume.pipelineStage || "pending";
     const rawText = resume.rawText;
     const jobDescription = resume.jobDescription ?? "";
 
     // Stage 1: Extract
-    await updateStage(resumeId, "extracting");
-    logger.info({ resumeId }, "Starting extraction agent");
-    const extracted = await extractionAgent(rawText);
+    if (currentStage === "pending" || currentStage === "error") {
+      await updateStage(resumeId, "extracting");
+      logger.info({ resumeId }, "Starting extraction agent");
+      const extracted = await extractionAgent(rawText);
 
-    // Clear old extracted skills and save new ones
-    await ExtractedSkillModel.deleteMany({ resumeId });
-    if (extracted.skills.length > 0) {
-      await ExtractedSkillModel.insertMany(
-        extracted.skills.map((s) => ({
-          resumeId,
-          skillName: s.skillName,
-          category: s.category,
-          confidenceScore: s.confidenceScore,
-        }))
-      );
+      await ExtractedSkillModel.deleteMany({ resumeId });
+      if (extracted.skills.length > 0) {
+        await ExtractedSkillModel.insertMany(
+          extracted.skills.map((s) => ({
+            resumeId,
+            skillName: s.skillName,
+            category: s.category,
+            confidenceScore: s.confidenceScore,
+          }))
+        );
+      }
+      if (stopAtStage === "extracting") return;
     }
 
     // Stage 2: Gap Analysis
-    await updateStage(resumeId, "analyzing_gaps");
-    logger.info({ resumeId }, "Starting gap analysis agent");
-    const gaps = await gapAnalysisAgent(extracted, jobDescription);
+    if (resume.pipelineStage === "extracting" || currentStage === "analyzing_gaps") {
+      await updateStage(resumeId, "analyzing_gaps");
+      logger.info({ resumeId }, "Starting gap analysis agent");
+      
+      const skills = await ExtractedSkillModel.find({ resumeId });
+      const extracted = { skills: skills.map(s => s.toObject()) };
 
-    await SkillGapModel.deleteMany({ resumeId });
-    let savedGaps: Array<{ id: string; missingSkill: string; importanceLevel: string }> = [];
-    if (gaps.length > 0) {
-      const createdGaps = await SkillGapModel.insertMany(
-        gaps.map((g) => ({
-          resumeId,
-          missingSkill: g.missingSkill,
-          importanceLevel: g.importanceLevel,
-          suggestion: g.suggestion,
-        }))
-      );
-      savedGaps = createdGaps.map(g => ({
-        id: g._id.toString(),
-        missingSkill: g.missingSkill,
-        importanceLevel: g.importanceLevel || "moderate"
-      }));
+      const gaps = await gapAnalysisAgent(extracted, jobDescription);
+
+      await SkillGapModel.deleteMany({ resumeId });
+      if (gaps.length > 0) {
+        await SkillGapModel.insertMany(
+          gaps.map((g) => ({
+            resumeId,
+            missingSkill: g.missingSkill,
+            importanceLevel: g.importanceLevel,
+            suggestion: g.suggestion,
+          }))
+        );
+      }
+      if (stopAtStage === "analyzing_gaps") return;
     }
 
     // Stage 3: Suggestions
-    await updateStage(resumeId, "generating_suggestions");
-    logger.info({ resumeId }, "Starting suggestion agent");
-    const suggestions = await suggestionAgent(
-      savedGaps.map((g) => ({
-        id: g.id,
-        gapId: g.id,
-        missingSkill: g.missingSkill,
-        importanceLevel: g.importanceLevel as "critical" | "moderate" | "nice-to-have",
-        bullets: [],
-        applied: false
-      })),
-      rawText
-    );
+    if (resume.pipelineStage === "analyzing_gaps" || currentStage === "generating_suggestions") {
+      await updateStage(resumeId, "generating_suggestions");
+      logger.info({ resumeId }, "Starting suggestion agent");
 
-    // Update gaps with suggestion text
-    for (const sugg of suggestions) {
-      await SkillGapModel.findByIdAndUpdate(sugg.gapId, {
-        suggestion: sugg.bullets.join(" | ")
-      });
+      const gaps = await SkillGapModel.find({ resumeId });
+      const suggestions = await suggestionAgent(
+        gaps.map((g: any) => ({
+          id: g._id.toString(),
+          gapId: g._id.toString(),
+          missingSkill: g.missingSkill,
+          importanceLevel: g.importanceLevel as "critical" | "moderate" | "nice-to-have",
+          bullets: [],
+          applied: false
+        })),
+        rawText
+      );
+
+      for (const sugg of suggestions) {
+        await SkillGapModel.findByIdAndUpdate(sugg.gapId, {
+          suggestion: sugg.bullets.join(" | ")
+        });
+      }
+      if (stopAtStage === "generating_suggestions") return;
     }
 
     // Stage 4: Rewrite
-    await updateStage(resumeId, "rewriting");
-    logger.info({ resumeId }, "Starting rewrite agent");
-    const rewrittenText = await rewriteAgent(rawText, suggestions);
+    if (resume.pipelineStage === "generating_suggestions" || currentStage === "rewriting") {
+      await updateStage(resumeId, "rewriting");
+      logger.info({ resumeId }, "Starting rewrite agent");
 
-    // Get current version number
-    const versionCount = await ResumeVersionModel.countDocuments({ resumeId });
-    const nextVersion = versionCount + 1;
+      const gaps = await SkillGapModel.find({ resumeId });
+      const suggestions = gaps.map((g: any) => ({
+        id: g._id.toString(),
+        gapId: g._id.toString(),
+        missingSkill: g.missingSkill,
+        importanceLevel: g.importanceLevel,
+        bullets: g.suggestion ? g.suggestion.split(" | ") : [],
+        applied: false
+      }));
 
-    // Stage 5: Validation
-    await updateStage(resumeId, "validating");
-    logger.info({ resumeId }, "Starting validation agent");
-    const validation = await validationAgent(rewrittenText, jobDescription);
+      const rewrittenText = await rewriteAgent(rawText, suggestions);
 
-    // Save version with score
-    await ResumeVersionModel.create({
-      resumeId,
-      versionNumber: nextVersion,
-      content: rewrittenText,
-      score: validation.atsScore,
-    });
+      const versionCount = await ResumeVersionModel.countDocuments({ resumeId });
+      const nextVersion = versionCount + 1;
 
-    // Save validation
-    await ValidationModel.deleteMany({ resumeId });
-    await ValidationModel.create({
-      resumeId,
-      atsScore: validation.atsScore,
-      keywordScore: validation.keywordScore,
-      formattingScore: validation.formattingScore,
-      skillMatchScore: validation.skillMatchScore,
-      checklistResults: validation.checklist,
-    });
+      // Stage 5: Validation
+      await updateStage(resumeId, "validating");
+      logger.info({ resumeId }, "Starting validation agent");
+      const validation = await validationAgent(rewrittenText, jobDescription);
 
-    // Calculate match score
-    const matchScore = Math.round(
-      validation.skillMatchScore * 0.6 + validation.keywordScore * 0.4
-    );
+      await ResumeVersionModel.create({
+        resumeId,
+        versionNumber: nextVersion,
+        content: rewrittenText,
+        score: validation.atsScore,
+      });
 
-    await ResumeModel.findByIdAndUpdate(resumeId, {
-      pipelineStage: "complete",
-      matchScore
-    });
+      await ValidationModel.deleteMany({ resumeId });
+      await ValidationModel.create({
+        resumeId,
+        atsScore: validation.atsScore,
+        keywordScore: validation.keywordScore,
+        formattingScore: validation.formattingScore,
+        skillMatchScore: validation.skillMatchScore,
+        checklistResults: validation.checklist,
+      });
 
-    logger.info({ resumeId, atsScore: validation.atsScore, matchScore }, "Pipeline complete");
+      const matchScore = Math.round(
+        validation.skillMatchScore * 0.6 + validation.keywordScore * 0.4
+      );
+
+      await ResumeModel.findByIdAndUpdate(resumeId, {
+        pipelineStage: "complete",
+        matchScore
+      });
+
+      logger.info({ resumeId, matchScore }, "Pipeline complete");
+    }
   } catch (err) {
     logger.error({ resumeId, err }, "Pipeline failed");
     await updateStage(resumeId, "error");

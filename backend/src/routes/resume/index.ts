@@ -94,14 +94,12 @@ router.post("/resume/upload", upload.single("resumeFile"), async (req, res): Pro
 
     const mapped = mapResume(resume);
 
-    // Await pipeline on Vercel because background tasks (setImmediate) 
-    // are terminated immediately after the response is sent.
+    // Await first 2 stages to keep the initial response fast (~10s)
+    // while ensuring the analysis has actually started.
     try {
-      await runPipeline(mapped.id);
+      await runPipeline(mapped.id, "analyzing_gaps");
     } catch (err) {
-      console.error("Pipeline error during upload:", err);
-      // We still return 201 because the resume was created, 
-      // but the pipeline failure will be reflected in its status.
+      console.error("Initial pipeline error:", err);
     }
 
     res.status(201).json(mapped);
@@ -151,6 +149,15 @@ router.get("/resume/:id/status", async (req, res): Promise<void> => {
   if (!resume) {
     res.status(404).json({ error: "Resume not found" });
     return;
+  }
+
+  // Drive the pipeline forward on each poll (Serverless-safe)
+  if (resume.pipelineStage !== "complete" && resume.pipelineStage !== "error") {
+    // We don't await the whole thing here, we just trigger the next stage
+    // and return the current status immediately.
+    runPipeline(resume._id.toString()).catch(err => {
+      console.error("Poll-triggered pipeline error:", err);
+    });
   }
 
   const stageOrder = [
