@@ -1,7 +1,7 @@
 import { useGetGaps, getGetGapsQueryKey } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 
-export function GapAnalysisTab({ resumeId }: { resumeId: string | null }) {
+export function GapAnalysisTab({ resumeId, pipelineStage }: { resumeId: string | null; pipelineStage: string | null }) {
   const { data, isLoading } = useGetGaps((resumeId as any) ?? "", {
     query: {
       enabled: !!resumeId,
@@ -11,6 +11,10 @@ export function GapAnalysisTab({ resumeId }: { resumeId: string | null }) {
 
   if (!resumeId) return <div className="text-center py-20">Upload a resume to see gap analysis.</div>;
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  if (!data || data.length === 0) {
+    const ready = ["analyzing_gaps", "generating_suggestions", "rewriting", "validating", "complete"].includes(pipelineStage ?? "");
+    return <div className="text-center py-20 text-muted-foreground">{ready ? "No skill gaps found for this resume yet." : "Gap analysis is still running. Please wait a moment."}</div>;
+  }
 
   return (
     <div className="space-y-8">

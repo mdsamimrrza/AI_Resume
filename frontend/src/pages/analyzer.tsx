@@ -72,11 +72,11 @@ export default function Analyzer() {
             <div className="transition-all duration-300 ease-in-out">
               {activeTab === "upload" && <UploadTab onUploadSuccess={(id) => { setResumeId(id); setActiveTab("extraction"); }} />}
               {activeTab === "extraction" && <ExtractionTab resumeId={resumeId} />}
-              {activeTab === "gaps" && <GapAnalysisTab resumeId={resumeId} />}
-              {activeTab === "suggestions" && <SuggestionsTab resumeId={resumeId} />}
-              {activeTab === "rewrite" && <RewriteTab resumeId={resumeId} />}
-              {activeTab === "diff" && <DiffViewerTab resumeId={resumeId} />}
-              {activeTab === "validation" && <ValidationTab resumeId={resumeId} />}
+              {activeTab === "gaps" && <GapAnalysisTab resumeId={resumeId} pipelineStage={statusData?.stage ?? null} />}
+              {activeTab === "suggestions" && <SuggestionsTab resumeId={resumeId} pipelineStage={statusData?.stage ?? null} />}
+              {activeTab === "rewrite" && <RewriteTab resumeId={resumeId} pipelineStage={statusData?.stage ?? null} />}
+              {activeTab === "diff" && <DiffViewerTab resumeId={resumeId} pipelineStage={statusData?.stage ?? null} />}
+              {activeTab === "validation" && <ValidationTab resumeId={resumeId} pipelineStage={statusData?.stage ?? null} />}
             </div>
           </div>
         </main>

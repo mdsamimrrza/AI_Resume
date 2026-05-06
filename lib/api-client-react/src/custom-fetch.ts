@@ -78,6 +78,40 @@ function resolveUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
+function appendCacheBuster(input: RequestInfo | URL, method: string): RequestInfo | URL {
+  if (method !== "GET" && method !== "HEAD") return input;
+
+  const rawUrl = resolveUrl(input);
+  const isRelative = rawUrl.startsWith("/");
+  const base =
+    typeof window !== "undefined" && window.location
+      ? window.location.origin
+      : "http://localhost";
+
+  let url: URL;
+  try {
+    url = new URL(rawUrl, isRelative ? base : undefined);
+  } catch {
+    return input;
+  }
+
+  if (!url.pathname.startsWith("/api/")) {
+    return input;
+  }
+
+  url.searchParams.set("_ts", `${Date.now()}`);
+
+  if (typeof input === "string") {
+    return isRelative ? `${url.pathname}${url.search}${url.hash}` : url.toString();
+  }
+
+  if (isUrl(input)) {
+    return url;
+  }
+
+  return new Request(isRelative ? `${url.pathname}${url.search}${url.hash}` : url.toString(), input);
+}
+
 function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
   const headers = new Headers();
 
@@ -330,6 +364,7 @@ export async function customFetch<T = unknown>(
   const { responseType = "auto", headers: headersInit, ...init } = options;
 
   const method = resolveMethod(input, init.method);
+  input = appendCacheBuster(input, method);
 
   if (init.body != null && (method === "GET" || method === "HEAD")) {
     throw new TypeError(`customFetch: ${method} requests cannot have a body.`);

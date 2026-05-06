@@ -1,7 +1,7 @@
 import { useGetSuggestions, getGetSuggestionsQueryKey } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
 
-export function SuggestionsTab({ resumeId }: { resumeId: string | null }) {
+export function SuggestionsTab({ resumeId, pipelineStage }: { resumeId: string | null; pipelineStage: string | null }) {
   const { data, isLoading } = useGetSuggestions((resumeId as any) ?? "", {
     query: {
       enabled: !!resumeId,
@@ -11,6 +11,10 @@ export function SuggestionsTab({ resumeId }: { resumeId: string | null }) {
 
   if (!resumeId) return <div className="text-center py-20">Upload a resume to see suggestions.</div>;
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  if (!data || data.length === 0) {
+    const ready = ["generating_suggestions", "rewriting", "validating", "complete"].includes(pipelineStage ?? "");
+    return <div className="text-center py-20 text-muted-foreground">{ready ? "No suggestions were generated for this resume yet." : "Suggestions are still being generated. Please wait a moment."}</div>;
+  }
 
   return (
     <div className="space-y-8">

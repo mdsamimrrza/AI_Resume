@@ -2,63 +2,60 @@ import { useGetDiff, getGetDiffQueryKey } from "@workspace/api-client-react";
 import { Loader2, SplitSquareHorizontal, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-
-type DiffEntry = { type: string; text: string };
-type LineType = "name" | "heading" | "subheading" | "bullet" | "meta" | "blank" | "body";
-
-function classifyLine(text: string, isFirst: boolean): LineType {
-  const t = text.trim();
-  if (!t) return "blank";
-  if (isFirst) return "name";
-  const allCaps = t === t.toUpperCase() && /[A-Z]/.test(t) && t.length >= 3;
-  if (allCaps || t.startsWith("## ") || (t.startsWith("**") && t.endsWith("**"))) return "heading";
-  if (t.includes("|")) return "subheading";
-  if (t.startsWith("- ") || t.startsWith("* ") || t.startsWith("• ")) return "bullet";
-  if (/[@\d()]/.test(t) && t.length < 80) return "meta";
-  return "body";
-}
+import { classifyResumeLine, normalizeResumeText } from "@/lib/resume-format";
 
 interface DiffLine {
-  segments: { text: string; type: "added" | "removed" | "equal" }[];
-  lineType: "added" | "removed" | "equal" | "mixed";
+  text: string;
+  lineType: "added" | "removed" | "equal";
 }
 
-function buildDiffLines(diffs: DiffEntry[]): DiffLine[] {
+function buildDiffLines(originalText: string, rewrittenText: string): DiffLine[] {
+  const original = normalizeResumeText(originalText).split("\n").map((line) => line.trim());
+  const rewritten = normalizeResumeText(rewrittenText).split("\n").map((line) => line.trim());
   const lines: DiffLine[] = [];
-  let current: DiffLine["segments"] = [];
 
-  for (const d of diffs) {
-    const type = (d.type ?? "equal") as "added" | "removed" | "equal";
-    const parts = (d.text || "").split("\n");
-    parts.forEach((part, idx) => {
-      if (part) current.push({ text: part, type });
-      if (idx < parts.length - 1) {
-        const hasAdded = current.some((s) => s.type === "added");
-        const hasRemoved = current.some((s) => s.type === "removed");
-        lines.push({
-          segments: current,
-          lineType: hasAdded && hasRemoved ? "mixed" : hasAdded ? "added" : hasRemoved ? "removed" : "equal",
-        });
-        current = [];
-      }
-    });
-  }
+  let i = 0;
+  let j = 0;
 
-  if (current.length) {
-    const hasAdded = current.some((s) => s.type === "added");
-    const hasRemoved = current.some((s) => s.type === "removed");
-    lines.push({
-      segments: current,
-      lineType: hasAdded && hasRemoved ? "mixed" : hasAdded ? "added" : hasRemoved ? "removed" : "equal",
-    });
+  while (i < original.length || j < rewritten.length) {
+    const left = original[i] ?? "";
+    const right = rewritten[j] ?? "";
+
+    if (left === right) {
+      lines.push({ text: left, lineType: "equal" });
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    if (right && original[i + 1] === right) {
+      lines.push({ text: left, lineType: "removed" });
+      i += 1;
+      continue;
+    }
+
+    if (left && rewritten[j + 1] === left) {
+      lines.push({ text: right, lineType: "added" });
+      j += 1;
+      continue;
+    }
+
+    if (left) {
+      lines.push({ text: left, lineType: "removed" });
+      i += 1;
+    }
+
+    if (right) {
+      lines.push({ text: right, lineType: "added" });
+      j += 1;
+    }
   }
 
   return lines;
 }
 
 function DiffResumeLine({ diffLine, isFirst }: { diffLine: DiffLine; isFirst: boolean }) {
-  const fullText = diffLine.segments.map((s) => s.text).join("");
-  const lt = classifyLine(fullText, isFirst);
+  const lt = classifyResumeLine(diffLine.text, isFirst);
   const rowBg =
     diffLine.lineType === "added"
       ? "bg-green-50 dark:bg-green-950/30"
@@ -74,43 +71,38 @@ function DiffResumeLine({ diffLine, isFirst }: { diffLine: DiffLine; isFirst: bo
       <span className="w-4 shrink-0" />
     );
 
-  const InlineSegments = () => (
-    <>
-      {diffLine.segments.map((seg, i) => (
-        <span
-          key={i}
-          className={
-            seg.type === "added"
-              ? "bg-green-200/70 dark:bg-green-700/40 text-green-800 dark:text-green-200 rounded px-0.5"
-              : seg.type === "removed"
-                ? "bg-red-200/70 dark:bg-red-700/40 text-red-800 dark:text-red-300 line-through rounded px-0.5"
-                : ""
-          }
-        >
-          {seg.text}
-        </span>
-      ))}
-    </>
+  const content = (
+    <span
+      className={
+        diffLine.lineType === "added"
+          ? "bg-green-200/70 dark:bg-green-700/40 text-green-800 dark:text-green-200 rounded px-0.5"
+          : diffLine.lineType === "removed"
+            ? "bg-red-200/70 dark:bg-red-700/40 text-red-800 dark:text-red-300 line-through rounded px-0.5"
+            : ""
+      }
+    >
+      {diffLine.text}
+    </span>
   );
 
   if (lt === "blank") return <div className={`h-2 ${rowBg}`} />;
 
   return (
-    <div className={`flex items-start gap-2 px-3 sm:px-6 py-0.5 ${rowBg} transition-colors`}>
+    <div className={`flex items-start gap-2 px-4 sm:px-6 py-0.5 ${rowBg} transition-colors`}>
       {gutter}
       <div className="flex-1 min-w-0">
-        {lt === "name" && <p style={{ fontSize: "clamp(18px, 4vw, 20px)", fontWeight: 700, fontFamily: "Georgia, serif", letterSpacing: -0.3, overflowWrap: "anywhere" }}><InlineSegments /></p>}
-        {lt === "heading" && <div style={{ borderBottom: "2px solid #7c3aed", marginTop: 14, marginBottom: 2, paddingBottom: 2 }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#7c3aed", fontFamily: "sans-serif" }}><InlineSegments /></span></div>}
-        {lt === "subheading" && <p style={{ fontSize: 12, fontWeight: 600, fontFamily: "sans-serif", marginTop: 6, overflowWrap: "anywhere" }}><InlineSegments /></p>}
-        {lt === "bullet" && <div style={{ display: "flex", gap: 6, marginLeft: 8, fontSize: 11 }}><span style={{ color: "#7c3aed", flexShrink: 0 }}>•</span><span style={{ overflowWrap: "anywhere" }}><InlineSegments /></span></div>}
-        {lt === "meta" && <p style={{ fontSize: 10, color: "#666", fontFamily: "sans-serif", overflowWrap: "anywhere" }}><InlineSegments /></p>}
-        {lt === "body" && <p style={{ fontSize: 11, overflowWrap: "anywhere" }}><InlineSegments /></p>}
+        {lt === "name" && <p style={{ fontSize: "clamp(18px, 3vw, 20px)", fontWeight: 700, fontFamily: "Georgia, serif", letterSpacing: -0.3, overflowWrap: "anywhere" }}>{content}</p>}
+        {lt === "heading" && <div style={{ borderBottom: "2px solid #7c3aed", marginTop: 14, marginBottom: 2, paddingBottom: 2 }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#7c3aed", fontFamily: "sans-serif" }}>{content}</span></div>}
+        {lt === "subheading" && <p style={{ fontSize: 12, fontWeight: 600, fontFamily: "sans-serif", marginTop: 6, overflowWrap: "anywhere" }}>{content}</p>}
+        {lt === "bullet" && <div style={{ display: "flex", gap: 6, marginLeft: 8, fontSize: 11 }}><span style={{ color: "#7c3aed", flexShrink: 0 }}>•</span><span style={{ overflowWrap: "anywhere" }}>{content}</span></div>}
+        {lt === "meta" && <p style={{ fontSize: 10, color: "#666", fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{content}</p>}
+        {lt === "body" && <p style={{ fontSize: 11, fontWeight: 400, overflowWrap: "anywhere" }}>{content}</p>}
       </div>
     </div>
   );
 }
 
-export function DiffViewerTab({ resumeId }: { resumeId: string | null }) {
+export function DiffViewerTab({ resumeId, pipelineStage }: { resumeId: string | null; pipelineStage: string | null }) {
   const { data, isLoading } = useGetDiff((resumeId as any) ?? "", {
     query: { enabled: !!resumeId, queryKey: getGetDiffQueryKey((resumeId as any) ?? "") },
   });
@@ -133,11 +125,11 @@ export function DiffViewerTab({ resumeId }: { resumeId: string | null }) {
     );
   }
 
-  const diffs = (data?.diffs || []) as DiffEntry[];
-  const diffLines = buildDiffLines(diffs);
-  const additions = diffLines.filter((l) => l.lineType === "added" || l.lineType === "mixed").length;
+  const diffLines = buildDiffLines(data?.originalText || "", data?.rewrittenText || "");
+  const additions = diffLines.filter((l) => l.lineType === "added").length;
   const removals = diffLines.filter((l) => l.lineType === "removed").length;
   let firstContentSeen = false;
+  const diffReady = ["rewriting", "validating", "complete"].includes(pipelineStage ?? "");
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -151,22 +143,19 @@ export function DiffViewerTab({ resumeId }: { resumeId: string | null }) {
           <Badge className="bg-red-500/15 text-red-400 border-red-500/30"><Minus className="w-3 h-3 mr-1" />{removals} removed</Badge>
         </div>
       </div>
-      <div className="bg-gray-100 dark:bg-zinc-900 rounded-xl p-3 sm:p-6">
-        <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-          <div
-            className="w-full max-w-[720px] min-w-[280px] sm:min-w-[680px] bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-gray-200 dark:border-zinc-700 mx-auto overflow-hidden py-6 sm:py-8"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            {diffLines.length === 0 ? (
-              <div className="text-center text-gray-400 py-12"><p>No differences found yet. The rewrite may still be processing.</p></div>
-            ) : (
-              diffLines.map((diffLine, i) => {
-                const fullText = diffLine.segments.map((s) => s.text).join("").trim();
-                const isFirst = fullText && !firstContentSeen ? (firstContentSeen = true, true) : false;
-                return <DiffResumeLine key={i} diffLine={diffLine} isFirst={isFirst} />;
-              })
-            )}
-          </div>
+      <div className="bg-gray-100 dark:bg-zinc-900 rounded-xl p-3 sm:p-6 lg:p-8">
+        <div
+          className="w-full max-w-[760px] bg-white dark:bg-zinc-800 rounded-xl shadow-lg border border-gray-200 dark:border-zinc-700 mx-auto overflow-hidden py-6 sm:py-8"
+          style={{ fontFamily: "Georgia, serif" }}
+        >
+          {diffLines.length === 0 ? (
+            <div className="text-center text-gray-400 py-12"><p>{diffReady ? "No visible differences found yet." : "Diff view is waiting for the rewrite stage to finish."}</p></div>
+          ) : (
+            diffLines.map((diffLine, i) => {
+              const isFirst = diffLine.text.trim() && !firstContentSeen ? (firstContentSeen = true, true) : false;
+              return <DiffResumeLine key={i} diffLine={diffLine} isFirst={isFirst} />;
+            })
+          )}
         </div>
       </div>
     </motion.div>

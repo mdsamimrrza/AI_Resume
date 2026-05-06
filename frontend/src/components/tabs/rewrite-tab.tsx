@@ -4,56 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { useState } from "react";
-
-type LineType = "name" | "heading" | "subheading" | "bullet" | "meta" | "blank" | "body";
-
-interface ParsedLine {
-  type: LineType;
-  text: string;
-}
-
-function parseLine(line: string, index: number): ParsedLine {
-  const t = line.trim();
-  if (!t) return { type: "blank", text: "" };
-  if (index === 0) return { type: "name", text: t };
-  const allCaps = t === t.toUpperCase() && /[A-Z]/.test(t) && t.length >= 3;
-  if (allCaps || t.startsWith("## ") || (t.startsWith("**") && t.endsWith("**") && !t.slice(2, -2).includes(" | "))) {
-    return { type: "heading", text: t.replace(/^#+\s*/, "").replace(/\*\*/g, "") };
-  }
-  if (t.includes("|") || t.includes("•") && t.split("•").length < 4) {
-    return { type: "subheading", text: t };
-  }
-  if (t.startsWith("- ") || t.startsWith("* ") || t.startsWith("• ")) {
-    return { type: "bullet", text: t.replace(/^[-*•]\s*/, "") };
-  }
-  if (/[@\d()\/\\]/.test(t) && t.length < 80) {
-    return { type: "meta", text: t };
-  }
-  return { type: "body", text: t };
-}
-
-function parseResume(text: string): ParsedLine[] {
-  const rawLines = text.split("\n");
-  let firstNonEmpty = true;
-  return rawLines.map((line) => {
-    const t = line.trim();
-    if (!t) return { type: "blank", text: "" };
-    const idx = firstNonEmpty ? 0 : 1;
-    if (firstNonEmpty) firstNonEmpty = false;
-    return parseLine(line, idx);
-  });
-}
+import { parseResume } from "@/lib/resume-format";
 
 function ResumeDocument({ text }: { text: string }) {
   const lines = parseResume(text);
 
   return (
-    <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
+    <div className="w-full pb-4">
       <div
-        className="w-full max-w-[720px] min-w-[280px] sm:min-w-[680px] bg-white text-gray-900 rounded-xl shadow-2xl border border-gray-200 mx-auto transition-all duration-500 hover:shadow-cyan-500/10"
+        className="w-full max-w-[760px] bg-white text-gray-900 rounded-xl shadow-2xl border border-gray-200 mx-auto transition-all duration-500 hover:shadow-cyan-500/10"
         style={{
           fontFamily: "'Inter', 'Georgia', serif",
-          padding: "clamp(18px, 4vw, 48px) clamp(16px, 5vw, 60px)",
+          padding: "clamp(20px, 4vw, 48px) clamp(18px, 5vw, 60px)",
           lineHeight: 1.5,
           position: "relative",
         }}
@@ -65,7 +27,7 @@ function ResumeDocument({ text }: { text: string }) {
                 <h1
                   key={i}
                   style={{
-                    fontSize: "clamp(24px, 5vw, 32px)",
+                    fontSize: "clamp(24px, 4vw, 32px)",
                     fontWeight: 800,
                     marginBottom: 4,
                     letterSpacing: -1,
@@ -77,24 +39,22 @@ function ResumeDocument({ text }: { text: string }) {
                   {line.text}
                 </h1>
               );
-            case "meta": {
-              const displayMeta = line.text.replace(/\|/g, " | ");
+            case "meta":
               return (
                 <p
                   key={i}
                   style={{
                     fontSize: 12,
                     color: "#666",
-                    marginBottom: 20,
+                    marginBottom: 8,
                     textAlign: "center",
                     fontWeight: 500,
                     overflowWrap: "anywhere",
                   }}
                 >
-                  {displayMeta}
+                  {line.text}
                 </p>
               );
-            }
             case "heading":
               return (
                 <div key={i} style={{ marginTop: 22, marginBottom: 6, paddingBottom: 3, borderBottom: "2px solid #7c3aed" }}>
@@ -104,11 +64,7 @@ function ResumeDocument({ text }: { text: string }) {
                 </div>
               );
             case "subheading":
-              return (
-                <p key={i} style={{ fontSize: 13, fontWeight: 600, color: "#222", marginTop: 10, marginBottom: 2, fontFamily: "sans-serif", overflowWrap: "anywhere" }}>
-                  {line.text}
-                </p>
-              );
+              return <p key={i} style={{ fontSize: 13, fontWeight: 600, color: "#222", marginTop: 10, marginBottom: 2, fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{line.text}</p>;
             case "bullet":
               return (
                 <div key={i} style={{ display: "flex", gap: 10, marginBottom: 4, marginLeft: 12, fontSize: 13 }}>
@@ -133,10 +89,8 @@ function generatePDF(text: string) {
     switch (line.type) {
       case "name":
         return `<h1 style="font-size:22pt;font-weight:700;margin:0 0 2px;letter-spacing:-0.5px;text-align:center;">${line.text}</h1>`;
-      case "meta": {
-        const cleanMeta = line.text.replace(/\|/g, " | ");
-        return `<p style="font-size:9pt;color:#666;margin:0 0 16px;text-align:center;font-family:sans-serif;font-weight:500;">${cleanMeta}</p>`;
-      }
+      case "meta":
+        return `<p style="font-size:9pt;color:#666;margin:0 0 8px;text-align:center;font-family:sans-serif;font-weight:500;">${line.text}</p>`;
       case "heading":
         return `<div style="margin-top:18px;margin-bottom:5px;padding-bottom:3px;border-bottom:2px solid #7c3aed;"><span style="font-size:9pt;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#7c3aed;font-family:sans-serif;">${line.text}</span></div>`;
       case "subheading":
@@ -170,7 +124,7 @@ function generatePDF(text: string) {
   }
 }
 
-export function RewriteTab({ resumeId }: { resumeId: string | null }) {
+export function RewriteTab({ resumeId, pipelineStage }: { resumeId: string | null; pipelineStage: string | null }) {
   const [copied, setCopied] = useState(false);
   const { data, isLoading } = useGetRewrite((resumeId as any) ?? "", {
     query: { enabled: !!resumeId, queryKey: getGetRewriteQueryKey((resumeId as any) ?? "") },
@@ -206,6 +160,7 @@ export function RewriteTab({ resumeId }: { resumeId: string | null }) {
   const rawText = data?.rewrittenText || "";
   const text = rawText.replace(/\[OPTIMIZATION NOTICE:[\s\S]*?\]\n*/g, "");
   const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const rewriteReady = ["rewriting", "validating", "complete"].includes(pipelineStage ?? "");
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -226,13 +181,13 @@ export function RewriteTab({ resumeId }: { resumeId: string | null }) {
           </Button>
         </div>
       </div>
-      <div className="bg-gray-100 dark:bg-zinc-900 rounded-xl p-3 sm:p-6">
+      <div className="bg-gray-100 dark:bg-zinc-900 rounded-xl p-3 sm:p-6 lg:p-8">
         {text ? (
           <ResumeDocument text={text} />
         ) : (
-          <div className="bg-white rounded-xl shadow-md p-10 text-center text-gray-400 max-w-[720px] mx-auto">
+          <div className="bg-white rounded-xl shadow-md p-10 text-center text-gray-400 max-w-[760px] mx-auto">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-green-500" />
-            <p>Waiting for the rewrite to complete...</p>
+            <p>{rewriteReady ? "Final rewrite is being assembled..." : "Rewrite is still running. Please wait a moment."}</p>
           </div>
         )}
       </div>
