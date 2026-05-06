@@ -72,15 +72,12 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
       if (values.company?.trim()) formData.append("company", values.company.trim());
 
       try {
-        const apiUrl = `${window.location.origin}/api/resume/upload`;
-        console.log("Attempting upload to:", apiUrl);
-        const response = await fetch(apiUrl, {
+      try {
+        const response = await fetch("/api/resume/upload", {
           method: "POST",
           body: formData,
           keepalive: true,
           mode: 'cors',
-          cache: 'no-cache',
-          credentials: 'omit', // Multipart usually doesn't need cookies
         });
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
@@ -90,11 +87,7 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
         onUploadSuccess(String(res.id));
       } catch (err: any) {
         console.error("Critical PDF upload error:", err);
-        let detail = err.message;
-        if (err.message === "Failed to fetch") {
-          detail = `Network error: Connection to server failed. (Origin: ${window.location.origin}). Error: ${JSON.stringify(err)}`;
-        }
-        setError(detail);
+        setError("Network error: Connection to server failed. Please refresh the page and try again. (Common on Vercel cold starts)");
         setIsUploading(false);
       }
     } else {
