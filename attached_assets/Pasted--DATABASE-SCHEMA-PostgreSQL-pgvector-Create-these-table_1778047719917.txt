@@ -1,0 +1,165 @@
+---
+
+## DATABASE SCHEMA (PostgreSQL + pgvector)
+
+Create these tables:
+
+**resumes** — id, user_id, raw_text, file_url, created_at, iteration (int)
+**resume_versions** — id, resume_id, version_number, content, score, created_at
+**job_descriptions** — id, title, company, raw_text, required_skills (jsonb), created_at
+**extracted_skills** — id, resume_id, skill_name, category, confidence_score, embedding (vector 1536)
+**skill_gaps** — id, resume_id, job_id, missing_skill, importance_level, suggestion
+**validations** — id, resume_id, ats_score, checklist_results (jsonb), feedback
+
+---
+
+## AI AGENT PIPELINE (LangChain)
+
+Build 5 independent LangChain agents chained together. Each should be a class in `/backend/agents/`:
+
+### 1. ExtractionAgent
+- Input: raw resume text
+- Extract: skills, experience (years), job titles, education, tools/technologies
+- Output: structured JSON with categories (technical, soft skills, domain expertise)
+- Use GPT-4o with a detailed system prompt for structured output
+
+### 2. GapAnalysisAgent
+- Input: extracted skills JSON + job description text
+- Use pgvector cosine similarity to find semantically missing skills
+- Output: list of gaps with importance_level (critical/moderate/nice-to-have)
+
+### 3. SuggestionAgent
+- Input: skill gaps + resume context
+- Output: 3–5 specific, actionable improvement suggestions per gap
+- Include: what to add, how to phrase it, where in resume to place it
+
+### 4. RewriteAgent
+- Input: original resume + suggestions
+- Output: fully rewritten resume text applying all suggestions
+- Preserve original tone, just enhance with better keywords and structure
+
+### 5. ValidationAgent
+- Input: rewritten resume + job description
+- ATS scoring algorithm: keyword density (30%), formatting score (20%), skill match (50%)
+- Output: numeric ATS score (0–100) + checklist (jsonb) with pass/fail items
+
+---
+
+## BACKEND API ROUTES (FastAPI)
+
+POST   /api/resume/upload         — accepts PDF/DOCX, stores, triggers Celery pipeline
+GET    /api/resume/{id}/status    — returns pipeline stage progress (SSE stream)
+GET    /api/resume/{id}/extraction
+GET    /api/resume/{id}/gaps
+GET    /api/resume/{id}/suggestions
+GET    /api/resume/{id}/rewrite
+GET    /api/resume/{id}/diff      — returns before/after diff using diff-match-patch
+GET    /api/resume/{id}/validation
+POST   /api/resume/{id}/iterate   — trigger a new pipeline run (for iterative improvement)
+
+Use Server-Sent Events (SSE) for real-time pipeline progress updates to the frontend.
+
+---
+
+## FRONTEND UI (Next.js + Tailwind)
+
+### Design System
+- Colorful dark-themed dashboard with vibrant accent colors
+- Purple (#8B5CF6), Cyan (#06B6D4), Pink (#EC4899), Amber (#F59E0B), Green (#10B981)
+- Each tab has its own accent color
+- Smooth Framer Motion page transitions between tabs
+- Animated progress stepper showing which agent stage is complete
+
+### Pages / Tabs
+
+**1. Upload Tab** (purple accent)
+- Drag & drop resume upload (PDF/DOCX)
+- Job description text input or URL paste
+- Animated upload progress
+- "Analyze Resume" CTA button
+
+**2. Extraction Tab** (cyan accent)
+- Skill tags displayed as animated pill badges grouped by category
+- Experience timeline visualization
+- Confidence score bar for each extracted item
+
+**3. Gap Analysis Tab** (amber accent)
+- Side-by-side: "You have" vs "Job requires"
+- Missing skills as red badges, matched skills as green badges
+- pgvector similarity score shown per skill gap
+- Importance level filters (critical / moderate / nice-to-have)
+
+**4. Suggestions Tab** (pink accent)
+- Card per gap with 3–5 specific suggestion bullets
+- Each card has a "Apply this suggestion" toggle
+- Selected suggestions get queued for the rewrite
+
+**5. Rewrite Tab** (green accent)
+- Shows the full rewritten resume
+- Highlights changed sections with animated yellow glow on first render
+- "Re-run with different suggestions" button
+- Download as PDF button
+
+**6. Diff Viewer Tab** (split between purple/green)
+- Side-by-side original vs rewritten resume
+- Red for removed text, green for added text (diff-match-patch)
+- Toggle: unified view / split view
+- Change count badge ("47 improvements made")
+
+**7. Validation Tab** (amber accent)
+- Large circular ATS score gauge (animated, 0–100)
+- Checklist with pass/fail items (keyword presence, action verbs, formatting, length)
+- Score breakdown donut chart (keyword 30%, formatting 20%, skill match 50%)
+- "Iterate & Improve" button to run the full pipeline again
+
+### Global Sidebar Navigation
+- Vertical sidebar with icon + label for each tab
+- Stage completion status shown inline (✓ complete / spinner / locked)
+- Pipeline progress bar at top of sidebar
+
+---
+
+## ASYNC PIPELINE (Celery)
+
+When a resume is uploaded:
+1. Store resume in DB, return resume_id immediately
+2. Kick off Celery chain: extract → gap → suggest → rewrite → validate
+3. Each step updates `pipeline_stage` in Redis
+4. Frontend polls SSE endpoint to show live progress
+5. Each agent result stored to DB as it completes (not waiting for full chain)
+
+---
+
+## DOCKER COMPOSE
+
+Services:
+- `frontend` (Next.js, port 3000)
+- `backend` (FastAPI, port 8000)
+- `worker` (Celery worker, same image as backend)
+- `postgres` (PostgreSQL 15 with pgvector extension enabled on init)
+- `redis` (Redis 7)
+- `flower` (Celery monitoring UI, port 5555)
+
+Include a `Makefile` with:
+- `make up` → docker-compose up --build
+- `make down` → docker-compose down
+- `make logs` → docker-compose logs -f
+- `make seed` → runs seed script with 3 sample resumes
+
+---
+
+## EXTRA FEATURES (make it impressive)
+
+1. **Iteration History** — every time the user hits "Iterate & Improve", store the new version. Show version history dropdown (v1, v2, v3…) with score progression chart.
+
+2. **Portfolio Mode** — second input type: paste a GitHub URL or portfolio link. Scrape it (BeautifulSoup), extract project skills, and run through the same pipeline.
+
+3. **Match Score Badge** — prominent badge on the dashboard header showing overall resume-to-job match % (updates live as agents complete).
+
+4. **Keyboard Shortcuts** — `Cmd+1` through `Cmd+7` to switch tabs.
+
+5. **Dark/Light mode toggle** with smooth Framer Motion transition.
+
+---
+
+## ENVIRONMENT VARIABLES NEEDED
