@@ -77,7 +77,10 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
         const response = await fetch(apiUrl, {
           method: "POST",
           body: formData,
-          keepalive: true, // Help keep connection open on mobile
+          keepalive: true,
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'omit', // Multipart usually doesn't need cookies
         });
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
@@ -89,7 +92,7 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
         console.error("Critical PDF upload error:", err);
         let detail = err.message;
         if (err.message === "Failed to fetch") {
-          detail = "Network error: Connection to server failed. This can happen if the server is down, CORS is blocked, or the network is unstable. (Origin: " + window.location.origin + ")";
+          detail = `Network error: Connection to server failed. (Origin: ${window.location.origin}). Error: ${JSON.stringify(err)}`;
         }
         setError(detail);
         setIsUploading(false);
