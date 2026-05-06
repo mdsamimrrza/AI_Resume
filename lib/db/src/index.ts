@@ -19,7 +19,8 @@ async function connectDB() {
 
   if (!cached.promise) {
     const opts = {
-      bufferCommands: true, // Set to true to allow models to be used before connection
+      bufferCommands: true,
+      serverSelectionTimeoutMS: 5000, // Fail fast if IP is not whitelisted
     };
 
     cached.promise = mongoose.connect(process.env.MONGODB_URI!, opts).then((mongooseInstance) => {
