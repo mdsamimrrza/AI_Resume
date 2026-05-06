@@ -3,7 +3,11 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node"],
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "noEmitOnError": false,
+    "skipLibCheck": true
   },
   "include": ["src"],
   "references": [
