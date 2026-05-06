@@ -73,9 +73,11 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
 
       try {
         const apiUrl = `${window.location.origin}/api/resume/upload`;
+        console.log("Attempting upload to:", apiUrl);
         const response = await fetch(apiUrl, {
           method: "POST",
           body: formData,
+          keepalive: true, // Help keep connection open on mobile
         });
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
@@ -84,10 +86,12 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
         const res = await response.json();
         onUploadSuccess(String(res.id));
       } catch (err: any) {
-        console.error("PDF upload error:", err);
-        setError(err.message === "Failed to fetch" 
-          ? "Network error: Connection to server failed. This can happen on slow mobile networks with large files. Try using a smaller PDF or a faster connection."
-          : err.message || "Something went wrong uploading the PDF.");
+        console.error("Critical PDF upload error:", err);
+        let detail = err.message;
+        if (err.message === "Failed to fetch") {
+          detail = "Network error: Connection to server failed. This can happen if the server is down, CORS is blocked, or the network is unstable. (Origin: " + window.location.origin + ")";
+        }
+        setError(detail);
         setIsUploading(false);
       }
     } else {
