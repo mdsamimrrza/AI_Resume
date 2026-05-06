@@ -21,6 +21,40 @@ const uploadSchema = z.object({
 
 type UploadFormValues = z.infer<typeof uploadSchema>;
 
+let pdfWorkerConfigured = false;
+
+async function extractTextFromPdf(file: File): Promise<string> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
+  if (!pdfWorkerConfigured) {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      "pdfjs-dist/legacy/build/pdf.worker.mjs",
+      import.meta.url,
+    ).toString();
+    pdfWorkerConfigured = true;
+  }
+
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const pages: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item: any) => ("str" in item ? item.str : ""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (pageText) {
+      pages.push(pageText);
+    }
+  }
+
+  return pages.join("\n\n").trim();
+}
+
 export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -47,6 +81,15 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
   const onFormSubmit = async (values: UploadFormValues) => {
     setError(null);
     const jobDescription = (values.jobDescription || "").trim();
+    form.clearErrors("jobDescription");
+
+    if (jobDescription.length < 50) {
+      form.setError("jobDescription", {
+        type: "manual",
+        message: "Job description must be at least 50 characters",
+      });
+      return;
+    }
 
     // Validate resume source
     if (!file && (!values.rawText || values.rawText.trim().length < 10)) {
@@ -57,37 +100,46 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
     setIsUploading(true);
 
     if (file) {
-      // Check for Vercel's 4.5MB limit
-      if (file.size > 4.4 * 1024 * 1024) {
-        setError("File is too large for Vercel (Max 4.4MB). Please use a smaller PDF.");
+      if (file.size > 10 * 1024 * 1024) {
+        setError("File is too large (Max 10MB). Please use a smaller PDF.");
         setIsUploading(false);
         return;
       }
 
-      // PDF UPLOAD PATH
-      const formData = new FormData();
-      formData.append("resumeFile", file);
-      formData.append("jobDescription", jobDescription);
-      if (values.jobTitle?.trim()) formData.append("jobTitle", values.jobTitle.trim());
-      if (values.company?.trim()) formData.append("company", values.company.trim());
-
       try {
-        const response = await fetch("/api/resume/upload", {
-          method: "POST",
-          body: formData,
-        });
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.details || errData.error || `Server returned ${response.status}`);
+        const rawText = await extractTextFromPdf(file);
+
+        if (!rawText || rawText.length < 20) {
+          throw new Error("Could not read text from this PDF. Please paste the resume text instead.");
         }
-        const res = await response.json();
-        onUploadSuccess(String(res.id));
+
+        uploadResume.mutate(
+          {
+            data: {
+              rawText,
+              jobDescription,
+              jobTitle: values.jobTitle?.trim() || undefined,
+              company: values.company?.trim() || undefined,
+            } as any,
+          },
+          {
+            onSuccess: (res) => {
+              onUploadSuccess(String(res.id));
+              setIsUploading(false);
+            },
+            onError: (err: any) => {
+              console.error("PDF text upload error:", err);
+              setError(err?.data?.error || "Upload failed. Please try again.");
+              setIsUploading(false);
+            },
+          },
+        );
       } catch (err: any) {
-        console.error("Critical PDF upload error:", err);
+        console.error("PDF extraction error:", err);
         const message =
           err instanceof Error && err.message
             ? err.message
-            : "Connection to server failed. Please try again.";
+            : "Could not process the PDF. Please try another PDF or paste the text.";
         setError(`Upload failed: ${message}`);
         setIsUploading(false);
       }
