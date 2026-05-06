@@ -108,7 +108,7 @@ router.post("/resume/upload", upload.single("resumeFile"), async (req, res): Pro
     console.error("Critical upload error:", error);
     res.status(500).json({ 
       error: "Internal server error during upload", 
-      details: process.env.NODE_ENV === "development" ? error.message : undefined 
+      details: error.message // Showing details for debugging
     });
   }
 });
