@@ -1,14 +1,14 @@
 import type { GapResult } from "./gap_analysis";
 
 export interface SuggestionResult {
-  gapId: number;
+  gapId: string;
   missingSkill: string;
   importanceLevel: string;
   bullets: string[];
 }
 
 export async function suggestionAgent(
-  gaps: Array<GapResult & { id: number }>,
+  gaps: Array<GapResult & { id: string }>,
   resumeText: string
 ): Promise<SuggestionResult[]> {
   if (gaps.length === 0) return [];

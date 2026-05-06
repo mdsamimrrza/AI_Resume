@@ -30,6 +30,13 @@ const router: IRouter = Router();
 
 // In-memory lock to prevent parallel pipeline runs in the same process
 const activePipelines = new Set<string>();
+router.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Helper to map Mongoose documents to API response format
@@ -97,12 +104,11 @@ router.post("/resume/upload", upload.single("resumeFile"), async (req, res): Pro
 
     const mapped = mapResume(resume);
 
-    // Await first 2 stages to keep the initial response fast (~10s)
-    // while ensuring the analysis has actually started.
+    // Run full heuristic pipeline (no AI, very fast <1s)
     try {
-      await runPipeline(mapped.id, "analyzing_gaps");
+      await runPipeline(mapped.id);
     } catch (err) {
-      console.error("Initial pipeline error:", err);
+      console.error("Heuristic pipeline error:", err);
     }
 
     res.status(201).json(mapped);

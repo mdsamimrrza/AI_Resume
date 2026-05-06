@@ -55,7 +55,13 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
       logger.info({ resumeId }, "Starting gap analysis agent");
       
       const skills = await ExtractedSkillModel.find({ resumeId });
-      const extracted = { skills: skills.map(s => s.toObject()) };
+      const extracted: any = { 
+        skills: skills.map(s => s.toObject()),
+        experienceYears: resume.experienceYears || 0,
+        jobTitles: [],
+        education: [],
+        tools: []
+      };
 
       const gaps = await gapAnalysisAgent(extracted, jobDescription);
 
@@ -85,6 +91,7 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
           gapId: g._id.toString(),
           missingSkill: g.missingSkill,
           importanceLevel: g.importanceLevel as "critical" | "moderate" | "nice-to-have",
+          suggestion: g.suggestion || "",
           bullets: [],
           applied: false
         })),

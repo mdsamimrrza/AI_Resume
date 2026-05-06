@@ -8,6 +8,7 @@ const resumeSchema = new mongoose.Schema({
   iteration: { type: Number, default: 1 },
   pipelineStage: { type: String, default: "pending" },
   matchScore: Number,
+  experienceYears: Number,
   jobDescription: String,
   jobTitle: String,
   company: String,

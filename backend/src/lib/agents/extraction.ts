@@ -10,26 +10,65 @@ export interface ExtractedData {
   tools: string[];
 }
 
+const SKILL_DICTIONARY = {
+  technical: [
+    "React", "Node.js", "TypeScript", "JavaScript", "Python", "Java", "C++", "C#", "Docker", "AWS", "Azure", "GCP",
+    "SQL", "NoSQL", "MongoDB", "PostgreSQL", "React Native", "Flutter", "Swift", "Kotlin", "Go", "Rust", "PHP", "Ruby",
+    "Tailwind", "CSS", "HTML", "Redux", "GraphQL", "REST", "API", "Kubernetes", "CI/CD", "Git", "GitHub", "Jenkins",
+    "Terraform", "Next.js", "Angular", "Vue", "Express", "Spring", "Django", "Flask", "Laravel", "Rails"
+  ],
+  soft: [
+    "Communication", "Leadership", "Teamwork", "Problem Solving", "Time Management", "Adaptability",
+    "Critical Thinking", "Conflict Resolution", "Creativity", "Emotional Intelligence", "Agile", "Scrum"
+  ],
+  domain: [
+    "Project Management", "Product Management", "Marketing", "Sales", "Finance", "Healthcare", "E-commerce", "Fintech"
+  ]
+};
+
 export async function extractionAgent(rawText: string): Promise<ExtractedData> {
-  // Deterministic mock logic
   const text = rawText.toLowerCase();
-  const skills = [];
+  const skills: ExtractedData["skills"] = [];
   
-  if (text.includes("react")) skills.push({ skillName: "React", category: "technical" as const, confidenceScore: 0.9 });
-  if (text.includes("node") || text.includes("node.js")) skills.push({ skillName: "Node.js", category: "technical" as const, confidenceScore: 0.9 });
-  if (text.includes("typescript")) skills.push({ skillName: "TypeScript", category: "technical" as const, confidenceScore: 0.85 });
-  if (text.includes("management")) skills.push({ skillName: "Project Management", category: "domain" as const, confidenceScore: 0.8 });
-  
-  if (skills.length === 0) {
-    skills.push({ skillName: "JavaScript", category: "technical" as const, confidenceScore: 0.9 });
-    skills.push({ skillName: "Communication", category: "soft" as const, confidenceScore: 0.8 });
-  }
+  // Extract technical skills with more flexible matching
+  SKILL_DICTIONARY.technical.forEach(skill => {
+    // Escape special characters for regex (like C++)
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`\\b${escaped.toLowerCase()}(\\.?js)?\\b|\\b${escaped.toLowerCase()}\\b`, "i");
+    if (pattern.test(text)) {
+      skills.push({ skillName: skill, category: "technical", confidenceScore: 1.0 });
+    }
+  });
+
+  // Extract soft skills
+  SKILL_DICTIONARY.soft.forEach(skill => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`\\b${escaped.toLowerCase()}\\b`, "i").test(text)) {
+      skills.push({ skillName: skill, category: "soft", confidenceScore: 1.0 });
+    }
+  });
+
+  // Extract domain skills
+  SKILL_DICTIONARY.domain.forEach(skill => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`\\b${escaped.toLowerCase()}\\b`, "i").test(text)) {
+      skills.push({ skillName: skill, category: "domain", confidenceScore: 1.0 });
+    }
+  });
+
+  // Basic regex for experience
+  const expMatch = text.match(/(\d+)\+?\s*years?/);
+  const years = expMatch ? parseInt(expMatch[1]) : 0;
+
+  // Simple title detection (looking for common titles)
+  const titles = ["software engineer", "developer", "manager", "architect", "lead", "designer", "analyst"];
+  const foundTitles = titles.filter(t => text.includes(t));
 
   return {
     skills,
-    experienceYears: 3,
-    jobTitles: ["Software Engineer"],
-    education: ["B.S. Computer Science"],
+    experienceYears: years,
+    jobTitles: foundTitles.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
+    education: [],
     tools: skills.filter(s => s.category === "technical").map(s => s.skillName)
   };
 }

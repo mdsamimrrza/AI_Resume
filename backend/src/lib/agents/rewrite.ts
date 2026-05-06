@@ -1,19 +1,29 @@
-import type { SuggestionResult } from "./suggestion";
-
 export async function rewriteAgent(
-  originalText: string,
-  suggestions: SuggestionResult[]
+  resumeText: string,
+  suggestions: any[]
 ): Promise<string> {
-  let rewritten = originalText;
+  // Strip any legacy optimization notices if they exist
+  let rewritten = resumeText.replace(/\[OPTIMIZATION NOTICE:[\s\S]*?\]\n*/g, "");
   
   if (suggestions.length > 0) {
-    const addedSkills = suggestions.map(s => s.missingSkill).join(", ");
-    rewritten += `\n\n--- Enhanced Skills Section ---\nAdded: ${addedSkills}\n`;
+    const missing = suggestions.map(s => s.missingSkill);
     
-    suggestions.forEach(s => {
-      rewritten += `\n* Integrated ${s.missingSkill} experience to match job requirements.`;
-    });
+    // Try to find a "Skills" or "Technical Skills" section and inject
+    const skillsSectionPattern = /(skills|technical skills|competencies|technologies)[:\s]*([\s\S]*?)(?=\n\n|\n[A-Z]|$)/i;
+    const match = resumeText.match(skillsSectionPattern);
+
+    if (match) {
+      const header = match[1];
+      const existingSkills = match[2];
+      const newSkills = missing.join(", ");
+      
+      const updatedSection = `${header}: ${existingSkills.trim()}, ${newSkills}`;
+      rewritten = resumeText.replace(match[0], updatedSection);
+    } else {
+      // No skills section found, just return original to avoid ugly headers
+      rewritten = resumeText;
+    }
   }
-  
+
   return rewritten;
 }
