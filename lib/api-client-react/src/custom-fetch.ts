@@ -8,7 +8,7 @@ export type BodyType<T> = T;
 
 export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
-const NO_BODY_STATUS = new Set([204, 205, 304]);
+const NO_BODY_STATUS = new Set([204, 205]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 // ---------------------------------------------------------------------------
@@ -336,6 +336,18 @@ export async function customFetch<T = unknown>(
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+
+  if ((method === "GET" || method === "HEAD") && init.cache == null) {
+    init.cache = "no-store";
+  }
+
+  if ((method === "GET" || method === "HEAD") && !headers.has("cache-control")) {
+    headers.set("cache-control", "no-cache, no-store, max-age=0");
+  }
+
+  if ((method === "GET" || method === "HEAD") && !headers.has("pragma")) {
+    headers.set("pragma", "no-cache");
+  }
 
   if (
     typeof init.body === "string" &&
