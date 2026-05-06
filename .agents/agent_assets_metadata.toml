@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Bn7IDiBFig229h5SlDd9A"
+uri = "file://resumelift.zip"
+type = "unspecified"
+title = "ResumeLift — Source Code"
