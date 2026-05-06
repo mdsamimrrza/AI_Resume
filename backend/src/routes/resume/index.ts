@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
-import pdf from "pdf-parse/lib/pdf-parse.js";
+import pdf from "pdf-parse";
 import {
   resumesTable as ResumeModel,
 } from "@workspace/db";
@@ -39,65 +39,78 @@ const mapResume = (doc: any) => ({
 // POST /resume/upload
 // Now supports both JSON (rawText) and Multipart (file upload)
 router.post("/resume/upload", upload.single("resumeFile"), async (req, res): Promise<void> => {
-  let rawText: string | undefined;
-  let jobDescription: string | undefined;
-  let jobTitle: string | undefined;
-  let company: string | undefined;
-  let portfolioUrl: string | undefined;
+  try {
+    let rawText: string | undefined;
+    let jobDescription: string | undefined;
+    let jobTitle: string | undefined;
+    let company: string | undefined;
+    let portfolioUrl: string | undefined;
 
-  if (req.file) {
-    // PDF Upload mode
-    try {
-      const data = await pdf(req.file.buffer);
-      rawText = data.text;
-      
-      // Other fields come from req.body in multipart form
-      jobDescription = req.body.jobDescription;
-      jobTitle = req.body.jobTitle;
-      company = req.body.company;
-      portfolioUrl = req.body.portfolioUrl;
-    } catch (err) {
-      res.status(400).json({ error: "Failed to parse PDF file" });
+    if (req.file) {
+      // PDF Upload mode
+      try {
+        const data = await pdf(req.file.buffer);
+        rawText = data.text;
+        
+        // Other fields come from req.body in multipart form
+        jobDescription = req.body.jobDescription;
+        jobTitle = req.body.jobTitle;
+        company = req.body.company;
+        portfolioUrl = req.body.portfolioUrl;
+      } catch (err) {
+        console.error("PDF parse error:", err);
+        res.status(400).json({ error: "Failed to parse PDF file. Please try pasting the text instead." });
+        return;
+      }
+    } else {
+      // JSON mode
+      const parsed = UploadResumeBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.message });
+        return;
+      }
+      ({ rawText, jobDescription, jobTitle, company, portfolioUrl } = parsed.data);
+    }
+
+    if (!rawText || !jobDescription) {
+      res.status(400).json({ error: "Resume text and job description are required" });
       return;
     }
-  } else {
-    // JSON mode
-    const parsed = UploadResumeBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: parsed.error.message });
+
+    const resume = await ResumeModel.create({
+      rawText,
+      jobDescription,
+      jobTitle,
+      company,
+      portfolioUrl,
+      pipelineStage: "pending",
+      iteration: 1,
+    });
+
+    if (!resume) {
+      res.status(500).json({ error: "Failed to create resume in database" });
       return;
     }
-    ({ rawText, jobDescription, jobTitle, company, portfolioUrl } = parsed.data);
+
+    const mapped = mapResume(resume);
+
+    // Run pipeline async (fire and forget)
+    // Note: On Vercel, this might be cut short. 
+    // Ideally use a background job/webhook.
+    setImmediate(() => {
+      runPipeline(mapped.id).catch(err => {
+        console.error("Pipeline error:", err);
+      });
+    });
+
+    res.status(201).json(mapped);
+  } catch (error: any) {
+    console.error("Critical upload error:", error);
+    res.status(500).json({ 
+      error: "Internal server error during upload", 
+      details: process.env.NODE_ENV === "development" ? error.message : undefined 
+    });
   }
-
-  if (!rawText || !jobDescription) {
-    res.status(400).json({ error: "Resume text and job description are required" });
-    return;
-  }
-
-  const resume = await ResumeModel.create({
-    rawText,
-    jobDescription,
-    jobTitle,
-    company,
-    portfolioUrl,
-    pipelineStage: "pending",
-    iteration: 1,
-  });
-
-  if (!resume) {
-    res.status(500).json({ error: "Failed to create resume" });
-    return;
-  }
-
-  const mapped = mapResume(resume);
-
-  // Run pipeline async (fire and forget)
-  setImmediate(() => {
-    runPipeline(mapped.id).catch(() => {});
-  });
-
-  res.status(201).json(mapped);
 });
 
 // GET /resume
