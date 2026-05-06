@@ -1,15 +1,14 @@
 # Ignore large/sensitive files from Vercel deployments
 .env
-node_modules
-resumelift.tar.gz
-attached_assets
 *.tar.gz
 *.zip
 
-# Dev artifacts
-backend/dist
-frontend/dist
-lib/*/dist
+# Local dev only files
+node_modules
 
-# Local dev only
-dev.mjs
+# Lib dist (libs are bundled into backend/dist by esbuild)
+lib/*/dist
+frontend/dist
+
+# Don't upload attached assets (not needed at runtime)
+attached_assets

@@ -1,11 +1,11 @@
 {
   "version": 2,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm run build:vercel",
+  "buildCommand": "node ./backend/build.mjs && cd frontend && BASE_PATH=/ pnpm run build",
   "outputDirectory": "frontend/dist/public",
   "framework": null,
   "functions": {
-    "api/handler.ts": {
+    "api/handler.js": {
       "maxDuration": 30,
       "memory": 512
     }
@@ -13,7 +13,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/handler"
+      "destination": "/api/handler.js"
     },
     {
       "source": "/((?!api/).*)",
