@@ -74,7 +74,7 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
         });
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Server returned ${response.status}`);
+          throw new Error(errData.details || errData.error || `Server returned ${response.status}`);
         }
         const res = await response.json();
         onUploadSuccess(String(res.id));
