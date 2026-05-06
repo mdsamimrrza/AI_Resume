@@ -93,10 +93,23 @@ function DiffResumeLine({ diffLine, isFirst }: { diffLine: DiffLine; isFirst: bo
       <div className="flex-1 min-w-0">
         {lt === "name" && <p style={{ fontSize: "clamp(18px, 3vw, 20px)", fontWeight: 700, fontFamily: "Georgia, serif", letterSpacing: -0.3, overflowWrap: "anywhere" }}>{content}</p>}
         {lt === "heading" && <div style={{ borderBottom: "2px solid #7c3aed", marginTop: 14, marginBottom: 2, paddingBottom: 2 }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#7c3aed", fontFamily: "sans-serif" }}>{content}</span></div>}
-        {lt === "subheading" && <p style={{ fontSize: 12, fontWeight: 600, fontFamily: "sans-serif", marginTop: 6, overflowWrap: "anywhere" }}>{content}</p>}
+        {lt === "subheading" && (
+          <p style={{ fontSize: 12, fontWeight: 800, fontFamily: "sans-serif", marginTop: 6, overflowWrap: "anywhere" }}>{content}</p>
+        )}
         {lt === "bullet" && <div style={{ display: "flex", gap: 6, marginLeft: 8, fontSize: 11 }}><span style={{ color: "#7c3aed", flexShrink: 0 }}>•</span><span style={{ overflowWrap: "anywhere" }}>{content}</span></div>}
         {lt === "meta" && <p style={{ fontSize: 10, color: "#666", fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{content}</p>}
-        {lt === "body" && <p style={{ fontSize: 11, fontWeight: 400, overflowWrap: "anywhere" }}>{content}</p>}
+        {lt === "body" && (
+          <p style={{ fontSize: 11, fontWeight: 400, overflowWrap: "anywhere" }}>
+            {diffLine.text.includes(":") && diffLine.text.split(":")[0].length < 30 ? (
+              <>
+                <strong style={{ fontWeight: 700 }}>{diffLine.text.split(":")[0]}:</strong>
+                {content} {/* Renders the diff but might overlap the prefix, it's a known trade-off for diffs */}
+              </>
+            ) : (
+              content
+            )}
+          </p>
+        )}
       </div>
     </div>
   );

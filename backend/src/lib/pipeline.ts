@@ -25,13 +25,14 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
       return;
     }
 
-    const currentStage = resume.pipelineStage || "pending";
+    let currentStage = resume.pipelineStage || "pending";
     const rawText = resume.rawText;
     const jobDescription = resume.jobDescription ?? "";
 
     // Stage 1: Extract
     if (currentStage === "pending" || currentStage === "error") {
       await updateStage(resumeId, "extracting");
+      currentStage = "extracting";
       logger.info({ resumeId }, "Starting extraction agent");
       const extracted = await extractionAgent(rawText);
 
@@ -50,8 +51,9 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
     }
 
     // Stage 2: Gap Analysis
-    if (resume.pipelineStage === "extracting" || currentStage === "analyzing_gaps") {
+    if (currentStage === "extracting") {
       await updateStage(resumeId, "analyzing_gaps");
+      currentStage = "analyzing_gaps";
       logger.info({ resumeId }, "Starting gap analysis agent");
       
       const skills = await ExtractedSkillModel.find({ resumeId });
@@ -80,8 +82,9 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
     }
 
     // Stage 3: Suggestions
-    if (resume.pipelineStage === "analyzing_gaps" || currentStage === "generating_suggestions") {
+    if (currentStage === "analyzing_gaps") {
       await updateStage(resumeId, "generating_suggestions");
+      currentStage = "generating_suggestions";
       logger.info({ resumeId }, "Starting suggestion agent");
 
       const gaps = await SkillGapModel.find({ resumeId });
@@ -106,9 +109,10 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
       if (stopAtStage === "generating_suggestions") return;
     }
 
-    // Stage 4: Rewrite
-    if (resume.pipelineStage === "generating_suggestions" || currentStage === "rewriting") {
+    // Stage 4 & 5: Rewrite & Validation
+    if (currentStage === "generating_suggestions" || currentStage === "rewriting") {
       await updateStage(resumeId, "rewriting");
+      currentStage = "rewriting";
       logger.info({ resumeId }, "Starting rewrite agent");
 
       const gaps = await SkillGapModel.find({ resumeId });
@@ -128,6 +132,7 @@ export async function runPipeline(resumeId: string, stopAtStage?: string): Promi
 
       // Stage 5: Validation
       await updateStage(resumeId, "validating");
+      currentStage = "validating";
       logger.info({ resumeId }, "Starting validation agent");
       const validation = await validationAgent(rewrittenText, jobDescription);
 

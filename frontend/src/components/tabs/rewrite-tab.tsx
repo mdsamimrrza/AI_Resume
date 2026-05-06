@@ -63,8 +63,31 @@ function ResumeDocument({ text }: { text: string }) {
                   </span>
                 </div>
               );
-            case "subheading":
-              return <p key={i} style={{ fontSize: 13, fontWeight: 600, color: "#222", marginTop: 10, marginBottom: 2, fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{line.text}</p>;
+            case "subheading": {
+              let titlePart = line.text;
+              let datePart = "";
+              const dateMatch = line.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b.*$/i);
+              if (dateMatch) {
+                datePart = dateMatch[0];
+                titlePart = line.text.replace(datePart, "").trim();
+              }
+              const titlePieces = titlePart.split("|");
+              return (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10, marginBottom: 2, fontFamily: "sans-serif", overflowWrap: "anywhere" }}>
+                  <p style={{ fontSize: 13, color: "#222" }}>
+                    <span style={{ fontWeight: 800 }}>{titlePieces[0].trim()}</span>
+                    {titlePieces.length > 1 && (
+                      <span style={{ fontWeight: 600 }}> | {titlePieces.slice(1).join(" | ").trim()}</span>
+                    )}
+                  </p>
+                  {datePart && (
+                    <p style={{ fontSize: 12, fontWeight: 600, color: "#444", flexShrink: 0, marginLeft: 16 }}>
+                      {datePart}
+                    </p>
+                  )}
+                </div>
+              );
+            }
             case "bullet":
               return (
                 <div key={i} style={{ display: "flex", gap: 10, marginBottom: 4, marginLeft: 12, fontSize: 13 }}>
@@ -74,8 +97,20 @@ function ResumeDocument({ text }: { text: string }) {
               );
             case "blank":
               return <div key={i} style={{ height: 6 }} />;
-            default:
+            default: {
+              let content = line.text;
+              if (content.includes(":")) {
+                const parts = content.split(":");
+                if (parts[0].length < 30) {
+                  return (
+                    <p key={i} style={{ fontSize: 12, color: "#444", marginBottom: 3, overflowWrap: "anywhere" }}>
+                      <strong style={{ color: "#222" }}>{parts[0]}:</strong>{parts.slice(1).join(":")}
+                    </p>
+                  );
+                }
+              }
               return <p key={i} style={{ fontSize: 12, color: "#444", marginBottom: 3, overflowWrap: "anywhere" }}>{line.text}</p>;
+            }
           }
         })}
       </div>
@@ -93,14 +128,39 @@ function generatePDF(text: string) {
         return `<p style="font-size:9pt;color:#666;margin:0 0 8px;text-align:center;font-family:sans-serif;font-weight:500;">${line.text}</p>`;
       case "heading":
         return `<div style="margin-top:18px;margin-bottom:5px;padding-bottom:3px;border-bottom:2px solid #7c3aed;"><span style="font-size:9pt;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#7c3aed;font-family:sans-serif;">${line.text}</span></div>`;
-      case "subheading":
-        return `<p style="font-size:11pt;font-weight:600;color:#222;margin:8px 0 2px;font-family:sans-serif;">${line.text}</p>`;
+      case "subheading": {
+        let titlePart = line.text;
+        let datePart = "";
+        const dateMatch = line.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b.*$/i);
+        if (dateMatch) {
+          datePart = dateMatch[0];
+          titlePart = line.text.replace(datePart, "").trim();
+        }
+        const titlePieces = titlePart.split("|");
+        const mainTitle = `<span style="font-weight:800">${titlePieces[0].trim()}</span>`;
+        const subTitle = titlePieces.length > 1 ? `<span style="font-weight:600"> | ${titlePieces.slice(1).join(" | ").trim()}</span>` : "";
+        const leftSide = `<p style="font-size:11pt;color:#222;margin:0;">${mainTitle}${subTitle}</p>`;
+        const rightSide = datePart ? `<p style="font-size:10pt;font-weight:600;color:#444;margin:0;white-space:nowrap;margin-left:16px;">${datePart}</p>` : "";
+        
+        return `<div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 2px;font-family:sans-serif;">
+          ${leftSide}
+          ${rightSide}
+        </div>`;
+      }
       case "bullet":
         return `<div style="display:flex;gap:8px;margin:0 0 3px 8px;font-size:10pt;"><span style="color:#7c3aed;flex-shrink:0;">•</span><span>${line.text}</span></div>`;
       case "blank":
         return `<div style="height:5px"></div>`;
-      default:
-        return `<p style="font-size:10pt;color:#444;margin:0 0 3px;">${line.text}</p>`;
+      default: {
+        let content = line.text;
+        if (content.includes(":")) {
+          const parts = content.split(":");
+          if (parts[0].length < 30) {
+            content = `<strong style="color:#222">${parts[0]}:</strong>${parts.slice(1).join(":")}`;
+          }
+        }
+        return `<p style="font-size:10pt;color:#444;margin:0 0 3px;">${content}</p>`;
+      }
     }
   }).join("");
 

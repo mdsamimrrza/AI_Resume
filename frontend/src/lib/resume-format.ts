@@ -47,8 +47,9 @@ function cleanupText(text: string): string {
   return text
     .replace(/\r/g, "")
     .replace(/\t/g, " ")
-    .replace(/Ã¢â‚¬Â¢|â€¢/g, "•")
-    .replace(/Ã¢â‚¬â€|Ã¢â‚¬â€œ|â€”|â€“/g, "-")
+    .replace(/Ã¢â‚¬Â¢|â€¢|·/g, "•")
+    .replace(/Ã¢â‚¬â€ |Ã¢â‚¬â€œ|â€”|â€“/g, "-")
+    .replace(/ (?=[•*] |- )/g, "\n")
     .replace(/[ ]{2,}/g, " ");
 }
 
