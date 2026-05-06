@@ -94,14 +94,15 @@ router.post("/resume/upload", upload.single("resumeFile"), async (req, res): Pro
 
     const mapped = mapResume(resume);
 
-    // Run pipeline async (fire and forget)
-    // Note: On Vercel, this might be cut short. 
-    // Ideally use a background job/webhook.
-    setImmediate(() => {
-      runPipeline(mapped.id).catch(err => {
-        console.error("Pipeline error:", err);
-      });
-    });
+    // Await pipeline on Vercel because background tasks (setImmediate) 
+    // are terminated immediately after the response is sent.
+    try {
+      await runPipeline(mapped.id);
+    } catch (err) {
+      console.error("Pipeline error during upload:", err);
+      // We still return 201 because the resume was created, 
+      // but the pipeline failure will be reflected in its status.
+    }
 
     res.status(201).json(mapped);
   } catch (error: any) {
@@ -385,9 +386,11 @@ router.post("/resume/:id/iterate", async (req, res): Promise<void> => {
     return;
   }
 
-  setImmediate(() => {
-    runPipeline(params.data.id).catch(() => {});
-  });
+  try {
+    await runPipeline(params.data.id);
+  } catch (err) {
+    console.error("Pipeline error during iteration:", err);
+  }
 
   res.json(mapResume(updated));
 });
