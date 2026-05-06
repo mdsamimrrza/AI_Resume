@@ -72,7 +72,6 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
       if (values.company?.trim()) formData.append("company", values.company.trim());
 
       try {
-      try {
         const response = await fetch("/api/resume/upload", {
           method: "POST",
           body: formData,
