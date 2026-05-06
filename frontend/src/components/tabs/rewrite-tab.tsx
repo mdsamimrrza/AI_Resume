@@ -8,108 +8,82 @@ import { parseResume } from "@/lib/resume-format";
 
 function ResumeDocument({ text }: { text: string }) {
   const lines = parseResume(text);
+  const S = {
+    wrap: { fontFamily: "'Times New Roman', Georgia, serif", lineHeight: 1.45, color: "#111" } as React.CSSProperties,
+    name: { fontSize: "clamp(20px, 3.5vw, 26px)", fontWeight: 700, textAlign: "center" as const, letterSpacing: 0, marginBottom: 2 },
+    meta: { fontSize: 11, textAlign: "center" as const, color: "#222", marginBottom: 6, overflowWrap: "anywhere" as const },
+    heading: { marginTop: 16, marginBottom: 3, paddingBottom: 2, borderBottom: "1.5px solid #111" },
+    headingText: { fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" as const, color: "#111", fontFamily: "sans-serif" },
+    subRow: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 7, marginBottom: 1, gap: 8 },
+    subLeft: { fontSize: 12, color: "#111", flex: 1 },
+    subDate: { fontSize: 11, color: "#333", flexShrink: 0, fontStyle: "italic" as const },
+    bullet: { display: "flex", gap: 8, marginBottom: 3, marginLeft: 14, fontSize: 11 },
+    bulletDot: { color: "#111", flexShrink: 0, marginTop: 1, fontSize: 11 },
+    bulletText: { color: "#222", overflowWrap: "anywhere" as const },
+    body: { fontSize: 11, color: "#222", marginBottom: 3, overflowWrap: "anywhere" as const },
+    blank: { height: 5 },
+  };
 
   return (
     <div className="w-full pb-4">
       <div
-        className="w-full max-w-[760px] bg-white text-gray-900 rounded-xl shadow-2xl border border-gray-200 mx-auto transition-all duration-500 hover:shadow-cyan-500/10"
-        style={{
-          fontFamily: "'Inter', 'Georgia', serif",
-          padding: "clamp(20px, 4vw, 48px) clamp(18px, 5vw, 60px)",
-          lineHeight: 1.5,
-          position: "relative",
-        }}
+        className="w-full max-w-[760px] bg-white rounded-xl shadow-2xl border border-gray-200 mx-auto"
+        style={{ ...S.wrap, padding: "clamp(20px, 4vw, 44px) clamp(20px, 5vw, 56px)" }}
       >
         {lines.map((line, i) => {
           switch (line.type) {
             case "name":
-              return (
-                <h1
-                  key={i}
-                  style={{
-                    fontSize: "clamp(24px, 4vw, 32px)",
-                    fontWeight: 800,
-                    marginBottom: 4,
-                    letterSpacing: -1,
-                    color: "#000",
-                    textAlign: "center",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {line.text}
-                </h1>
-              );
+              return <h1 key={i} style={S.name}>{line.text}</h1>;
             case "meta":
-              return (
-                <p
-                  key={i}
-                  style={{
-                    fontSize: 12,
-                    color: "#666",
-                    marginBottom: 8,
-                    textAlign: "center",
-                    fontWeight: 500,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {line.text}
-                </p>
-              );
+              return <p key={i} style={S.meta}>{line.text}</p>;
             case "heading":
               return (
-                <div key={i} style={{ marginTop: 22, marginBottom: 6, paddingBottom: 3, borderBottom: "2px solid #7c3aed" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#7c3aed", fontFamily: "sans-serif" }}>
-                    {line.text}
-                  </span>
+                <div key={i} style={S.heading}>
+                  <span style={S.headingText}>{line.text}</span>
                 </div>
               );
             case "subheading": {
               let titlePart = line.text;
               let datePart = "";
-              const dateMatch = line.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b.*$/i);
+              const dateMatch = line.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s\-–]+(?:\d{4}|Present)(?:[\s\-–]+(?:\d{4}|Present))?\b/i);
               if (dateMatch) {
-                datePart = dateMatch[0];
-                titlePart = line.text.replace(datePart, "").trim();
+                datePart = dateMatch[0].trim();
+                titlePart = line.text.replace(dateMatch[0], "").trim();
               }
-              const titlePieces = titlePart.split("|");
+              const pieces = titlePart.split("|");
               return (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 10, marginBottom: 2, fontFamily: "sans-serif", overflowWrap: "anywhere" }}>
-                  <p style={{ fontSize: 13, color: "#222" }}>
-                    <span style={{ fontWeight: 800 }}>{titlePieces[0].trim()}</span>
-                    {titlePieces.length > 1 && (
-                      <span style={{ fontWeight: 600 }}> | {titlePieces.slice(1).join(" | ").trim()}</span>
-                    )}
+                <div key={i} style={S.subRow}>
+                  <p style={S.subLeft}>
+                    <strong>{pieces[0].trim()}</strong>
+                    {pieces.length > 1 && <span style={{ fontWeight: 400 }}> | {pieces.slice(1).join(" | ").trim()}</span>}
                   </p>
-                  {datePart && (
-                    <p style={{ fontSize: 12, fontWeight: 600, color: "#444", flexShrink: 0, marginLeft: 16 }}>
-                      {datePart}
-                    </p>
-                  )}
+                  {datePart && <span style={S.subDate}>{datePart}</span>}
                 </div>
               );
             }
             case "bullet":
               return (
-                <div key={i} style={{ display: "flex", gap: 10, marginBottom: 4, marginLeft: 12, fontSize: 13 }}>
-                  <span style={{ color: "#7c3aed", marginTop: 4, flexShrink: 0, fontSize: 8 }}>•</span>
-                  <span style={{ color: "#444", overflowWrap: "anywhere" }}>{line.text}</span>
+                <div key={i} style={S.bullet}>
+                  <span style={S.bulletDot}>•</span>
+                  <span style={S.bulletText}>{line.text.replace(/^[-•*]\s*/, "")}</span>
                 </div>
               );
             case "blank":
-              return <div key={i} style={{ height: 6 }} />;
+              return <div key={i} style={S.blank} />;
             default: {
-              let content = line.text;
-              if (content.includes(":")) {
-                const parts = content.split(":");
-                if (parts[0].length < 30) {
+              if (line.text.includes(":")) {
+                const idx = line.text.indexOf(":");
+                const label = line.text.slice(0, idx);
+                const rest = line.text.slice(idx + 1);
+                if (label.length < 30) {
                   return (
-                    <p key={i} style={{ fontSize: 12, color: "#444", marginBottom: 3, overflowWrap: "anywhere" }}>
-                      <strong style={{ color: "#222" }}>{parts[0]}:</strong>{parts.slice(1).join(":")}
+                    <p key={i} style={S.body}>
+                      <strong>{label}:</strong>{rest}
                     </p>
                   );
                 }
               }
-              return <p key={i} style={{ fontSize: 12, color: "#444", marginBottom: 3, overflowWrap: "anywhere" }}>{line.text}</p>;
+              return <p key={i} style={S.body}>{line.text}</p>;
             }
           }
         })}
@@ -123,54 +97,48 @@ function generatePDF(text: string) {
   const bodyHtml = lines.map((line) => {
     switch (line.type) {
       case "name":
-        return `<h1 style="font-size:22pt;font-weight:700;margin:0 0 2px;letter-spacing:-0.5px;text-align:center;">${line.text}</h1>`;
+        return `<h1 style="font-size:18pt;font-weight:700;margin:0 0 2px;text-align:center;font-family:'Times New Roman',serif;">${line.text}</h1>`;
       case "meta":
-        return `<p style="font-size:9pt;color:#666;margin:0 0 8px;text-align:center;font-family:sans-serif;font-weight:500;">${line.text}</p>`;
+        return `<p style="font-size:9pt;color:#222;margin:0 0 6px;text-align:center;">${line.text}</p>`;
       case "heading":
-        return `<div style="margin-top:18px;margin-bottom:5px;padding-bottom:3px;border-bottom:2px solid #7c3aed;"><span style="font-size:9pt;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#7c3aed;font-family:sans-serif;">${line.text}</span></div>`;
+        return `<div style="margin-top:14px;margin-bottom:3px;padding-bottom:2px;border-bottom:1.5px solid #111;"><span style="font-size:9pt;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#111;font-family:Arial,sans-serif;">${line.text}</span></div>`;
       case "subheading": {
         let titlePart = line.text;
         let datePart = "";
-        const dateMatch = line.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b.*$/i);
+        const dateMatch = line.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s\-–]+(?:\d{4}|Present)(?:[\s\-–]+(?:\d{4}|Present))?\b/i);
         if (dateMatch) {
-          datePart = dateMatch[0];
-          titlePart = line.text.replace(datePart, "").trim();
+          datePart = dateMatch[0].trim();
+          titlePart = line.text.replace(dateMatch[0], "").trim();
         }
-        const titlePieces = titlePart.split("|");
-        const mainTitle = `<span style="font-weight:800">${titlePieces[0].trim()}</span>`;
-        const subTitle = titlePieces.length > 1 ? `<span style="font-weight:600"> | ${titlePieces.slice(1).join(" | ").trim()}</span>` : "";
-        const leftSide = `<p style="font-size:11pt;color:#222;margin:0;">${mainTitle}${subTitle}</p>`;
-        const rightSide = datePart ? `<p style="font-size:10pt;font-weight:600;color:#444;margin:0;white-space:nowrap;margin-left:16px;">${datePart}</p>` : "";
-        
-        return `<div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 2px;font-family:sans-serif;">
-          ${leftSide}
-          ${rightSide}
-        </div>`;
+        const pieces = titlePart.split("|");
+        const leftHtml = `<span style="font-weight:700">${pieces[0].trim()}</span>${pieces.length > 1 ? ` | ${pieces.slice(1).join(" | ").trim()}` : ""}`;
+        const rightHtml = datePart ? `<span style="font-style:italic;color:#333;">${datePart}</span>` : "";
+        return `<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 1px;gap:8px;"><p style="font-size:10pt;margin:0;">${leftHtml}</p>${rightHtml ? `<p style="font-size:9pt;margin:0;white-space:nowrap;">${rightHtml}</p>` : ""}</div>`;
       }
       case "bullet":
-        return `<div style="display:flex;gap:8px;margin:0 0 3px 8px;font-size:10pt;"><span style="color:#7c3aed;flex-shrink:0;">•</span><span>${line.text}</span></div>`;
+        return `<div style="display:flex;gap:6px;margin:0 0 2px 12px;font-size:9.5pt;"><span style="flex-shrink:0;">•</span><span>${line.text.replace(/^[-•*]\s*/, "")}</span></div>`;
       case "blank":
-        return `<div style="height:5px"></div>`;
+        return `<div style="height:4px"></div>`;
       default: {
-        let content = line.text;
-        if (content.includes(":")) {
-          const parts = content.split(":");
-          if (parts[0].length < 30) {
-            content = `<strong style="color:#222">${parts[0]}:</strong>${parts.slice(1).join(":")}`;
+        if (line.text.includes(":")) {
+          const idx = line.text.indexOf(":");
+          const label = line.text.slice(0, idx);
+          const rest = line.text.slice(idx + 1);
+          if (label.length < 30) {
+            return `<p style="font-size:9.5pt;color:#111;margin:0 0 2px;"><strong>${label}:</strong>${rest}</p>`;
           }
         }
-        return `<p style="font-size:10pt;color:#444;margin:0 0 3px;">${content}</p>`;
+        return `<p style="font-size:9.5pt;color:#222;margin:0 0 2px;">${line.text}</p>`;
       }
     }
   }).join("");
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Rewritten Resume</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Georgia&family=Inter:wght@400;600;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Georgia, serif; color: #111; background: #fff; padding: 36px 48px; max-width: 760px; margin: 0 auto; line-height: 1.6; }
-  @media print { body { padding: 10mm 15mm; } @page { margin: 0; size: A4; } }
-</style></head><body>${bodyHtml}<script>window.onload = () => { setTimeout(() => { window.print(); }, 500); }</script></body></html>`;
+  body { font-family: 'Times New Roman', Georgia, serif; color: #111; background: #fff; padding: 28px 40px; max-width: 740px; margin: 0 auto; line-height: 1.45; }
+  @media print { body { padding: 8mm 12mm; } @page { margin: 0; size: A4; } }
+</style></head><body>${bodyHtml}<script>window.onload = () => { setTimeout(() => { window.print(); }, 400); }</script></body></html>`;
 
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);

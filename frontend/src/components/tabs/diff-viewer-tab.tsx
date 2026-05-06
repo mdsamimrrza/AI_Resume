@@ -87,29 +87,53 @@ function DiffResumeLine({ diffLine, isFirst }: { diffLine: DiffLine; isFirst: bo
 
   if (lt === "blank") return <div className={`h-2 ${rowBg}`} />;
 
+  const renderContent = () => {
+    switch (lt) {
+      case "name":
+        return <p style={{ fontSize: "clamp(16px, 2.5vw, 20px)", fontWeight: 700, fontFamily: "'Times New Roman', Georgia, serif", textAlign: "center", overflowWrap: "anywhere" }}>{content}</p>;
+      case "heading":
+        return <div style={{ borderBottom: "1.5px solid #111", marginTop: 12, marginBottom: 2, paddingBottom: 2 }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "#111", fontFamily: "sans-serif" }}>{content}</span></div>;
+      case "subheading": {
+        let titlePart = diffLine.text;
+        let datePart = "";
+        const dateMatch = diffLine.text.match(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s\-–]+(?:\d{4}|Present)(?:[\s\-–]+(?:\d{4}|Present))?\b/i);
+        if (dateMatch) {
+          datePart = dateMatch[0].trim();
+          titlePart = diffLine.text.replace(dateMatch[0], "").trim();
+        }
+        const pieces = titlePart.split("|");
+        return (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6, marginBottom: 1, gap: 8 }}>
+            <p style={{ fontSize: 11, color: "#111", margin: 0 }}>
+              <strong>{pieces[0].trim()}</strong>
+              {pieces.length > 1 && <span style={{ fontWeight: 400 }}> | {pieces.slice(1).join(" | ").trim()}</span>}
+            </p>
+            {datePart && <span style={{ fontSize: 10, color: "#333", flexShrink: 0, fontStyle: "italic" }}>{datePart}</span>}
+          </div>
+        );
+      }
+      case "bullet":
+        return <div style={{ display: "flex", gap: 6, marginLeft: 12, fontSize: 11 }}><span style={{ color: "#111", flexShrink: 0 }}>•</span><span style={{ overflowWrap: "anywhere" }}>{content}</span></div>;
+      case "meta":
+        return <p style={{ fontSize: 10, color: "#333", textAlign: "center", fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{content}</p>;
+      default: {
+        if (diffLine.text.includes(":")) {
+          const idx = diffLine.text.indexOf(":");
+          const label = diffLine.text.slice(0, idx);
+          if (label.length < 30) {
+            return <p style={{ fontSize: 11, overflowWrap: "anywhere" }}><strong>{label}:</strong><span>{content}</span></p>;
+          }
+        }
+        return <p style={{ fontSize: 11, overflowWrap: "anywhere" }}>{content}</p>;
+      }
+    }
+  };
+
   return (
     <div className={`flex items-start gap-2 px-4 sm:px-6 py-0.5 ${rowBg} transition-colors`}>
       {gutter}
       <div className="flex-1 min-w-0">
-        {lt === "name" && <p style={{ fontSize: "clamp(18px, 3vw, 20px)", fontWeight: 700, fontFamily: "Georgia, serif", letterSpacing: -0.3, overflowWrap: "anywhere" }}>{content}</p>}
-        {lt === "heading" && <div style={{ borderBottom: "2px solid #7c3aed", marginTop: 14, marginBottom: 2, paddingBottom: 2 }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#7c3aed", fontFamily: "sans-serif" }}>{content}</span></div>}
-        {lt === "subheading" && (
-          <p style={{ fontSize: 12, fontWeight: 800, fontFamily: "sans-serif", marginTop: 6, overflowWrap: "anywhere" }}>{content}</p>
-        )}
-        {lt === "bullet" && <div style={{ display: "flex", gap: 6, marginLeft: 8, fontSize: 11 }}><span style={{ color: "#7c3aed", flexShrink: 0 }}>•</span><span style={{ overflowWrap: "anywhere" }}>{content}</span></div>}
-        {lt === "meta" && <p style={{ fontSize: 10, color: "#666", fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{content}</p>}
-        {lt === "body" && (
-          <p style={{ fontSize: 11, fontWeight: 400, overflowWrap: "anywhere" }}>
-            {diffLine.text.includes(":") && diffLine.text.split(":")[0].length < 30 ? (
-              <>
-                <strong style={{ fontWeight: 700 }}>{diffLine.text.split(":")[0]}:</strong>
-                {content} {/* Renders the diff but might overlap the prefix, it's a known trade-off for diffs */}
-              </>
-            ) : (
-              content
-            )}
-          </p>
-        )}
+        {renderContent()}
       </div>
     </div>
   );

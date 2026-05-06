@@ -54,55 +54,61 @@ function cleanupText(text: string): string {
 }
 
 export function normalizeResumeText(text: string): string {
-  const cleaned = cleanupText(text);
+  let t = text
+    .replace(/\r/g, "")
+    .replace(/\t/g, " ")
+    .replace(/Ã¢â‚¬Â¢|â€¢|·/g, "•")
+    .replace(/Ã¢â‚¬â€ |Ã¢â‚¬â€œ|â€"|â€"/g, "-");
+
+  // --- PHASE 1: Aggressive pre-splitting of single-blob text ---
+
+  // Split before every known section heading (even mid-sentence)
+  const headings = [
+    "WORK EXPERIENCE", "TECHNICAL SKILLS", "POSITIONS OF RESPONSIBILITY",
+    "EXPERIENCE", "EDUCATION", "PROJECTS", "CERTIFICATIONS",
+    "ACHIEVEMENTS", "LEADERSHIP", "SUMMARY", "SKILLS", "INTERNSHIP",
+  ];
+  for (const h of headings) {
+    const escaped = h.replace(/\s+/g, "\\s+");
+    t = t.replace(new RegExp(`(?<![\\n])(?=${escaped}\\b)`, "gi"), "\n");
+  }
+
+  // Split before bullet markers: ". -", "  -", " • ", " * "
+  t = t.replace(/ (?=[•*] |- )/g, "\n");
+
+  // Split contact info chunks: phone, email, github, linkedin, leetcode
+  t = t.replace(/([a-z])(\+91|\+\d{1,3}[-\s]?\d)/gi, "$1\n$2");
+  t = t.replace(/([^\s|])(\s+[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, "$1\n$2");
+  t = t.replace(/([^\s|])\s+((?:github|linkedin|leetcode|twitter)\.[a-z])/gi, "$1\n$2");
+
+  // Split lines that have name+phone jammed together
+  t = t.replace(/^([A-Za-z][A-Za-z .,]{5,}?)\s+(\+?\d[\d\-\s]{7,})$/gm, "$1\n$2");
+
+  // Collapse 3+ newlines to 2
+  t = t.replace(/\n{3,}/g, "\n\n");
+
+  // --- PHASE 2: Line-by-line normalization ---
   const normalizedLines: string[] = [];
 
-  for (const rawLine of cleaned.split("\n")) {
+  for (const rawLine of t.split("\n")) {
     let line = rawLine.trim();
     if (!line) {
       normalizedLines.push("");
       continue;
     }
 
-    line = line.replace(/\s*\|\s*$/g, "");
-    line = line.replace(new RegExp(`([a-z0-9/])\\s+((?:${SPLIT_HEADING_PATTERN})\\b)`, "g"), "$1\n$2");
+    // Strip trailing pipe
+    line = line.replace(/\s*\|\s*$/, "");
 
-    const pieces = line
-      .split("\n")
-      .flatMap((part) =>
-        part
-          .split(new RegExp(`(?=\\b(?:${SPLIT_HEADING_PATTERN})\\b)`, "g"))
-          .map((item) => item.trim())
-          .filter(Boolean),
-      );
-
-    for (let piece of pieces) {
-      const headingWithContent = piece.match(new RegExp(`^((?:${HEADING_PATTERN}))\\s*:?\\s+(.+)$`, "i"));
-      if (headingWithContent) {
-        normalizedLines.push(headingWithContent[1].replace(/\s+/g, " ").toUpperCase());
-        normalizedLines.push(headingWithContent[2].trim());
-        continue;
+    // Pipe-separated contact lines — split into individual items
+    if (line.includes("|") && /@|github|linkedin|leetcode|\+?\d/i.test(line)) {
+      for (const part of line.split("|").map(p => p.trim()).filter(Boolean)) {
+        normalizedLines.push(part);
       }
-
-      const namePhone = piece.match(/^([A-Z][A-Z\s]{5,})\s+(\+?\d[\d\- ]{7,})$/);
-      if (namePhone) {
-        normalizedLines.push(`${namePhone[1].trim()} | ${namePhone[2].trim()}`);
-        continue;
-      }
-
-      if (piece.includes("|") && /@|github|linkedin|leetcode|\+?\d/i.test(piece)) {
-        for (const part of piece.split("|").map((item) => item.trim()).filter(Boolean)) {
-          normalizedLines.push(part);
-        }
-        continue;
-      }
-
-      // Keep standalone generic headings intact instead of splitting them out of longer headings.
-      piece = piece.replace(/\bTECHNICAL\s+SKILLS\b/gi, "TECHNICAL SKILLS");
-      piece = piece.replace(/\bWORK\s+EXPERIENCE\b/gi, "WORK EXPERIENCE");
-
-      normalizedLines.push(piece);
+      continue;
     }
+
+    normalizedLines.push(line);
   }
 
   return normalizedLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
