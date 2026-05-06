@@ -57,6 +57,13 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
     setIsUploading(true);
 
     if (file) {
+      // Check for Vercel's 4.5MB limit
+      if (file.size > 4.4 * 1024 * 1024) {
+        setError("File is too large for Vercel (Max 4.4MB). Please use a smaller PDF.");
+        setIsUploading(false);
+        return;
+      }
+
       // PDF UPLOAD PATH
       const formData = new FormData();
       formData.append("resumeFile", file);
@@ -65,7 +72,8 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
       if (values.company?.trim()) formData.append("company", values.company.trim());
 
       try {
-        const response = await fetch("/api/resume/upload", {
+        const apiUrl = `${window.location.origin}/api/resume/upload`;
+        const response = await fetch(apiUrl, {
           method: "POST",
           body: formData,
         });
@@ -78,7 +86,7 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
       } catch (err: any) {
         console.error("PDF upload error:", err);
         setError(err.message === "Failed to fetch" 
-          ? "Network error: Connection to server failed. Please check your internet and try again."
+          ? "Network error: Connection to server failed. This can happen on slow mobile networks with large files. Try using a smaller PDF or a faster connection."
           : err.message || "Something went wrong uploading the PDF.");
         setIsUploading(false);
       }
