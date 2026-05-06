@@ -87,12 +87,33 @@ function DiffResumeLine({ diffLine, isFirst }: { diffLine: DiffLine; isFirst: bo
 
   if (lt === "blank") return <div className={`h-2 ${rowBg}`} />;
 
+  // Shared style constants — must match ResumeDocument in rewrite-tab.tsx exactly
+  const S = {
+    wrap:  { fontFamily: "'Times New Roman', Georgia, serif" } as React.CSSProperties,
+    name:  { fontSize: "clamp(18px, 3vw, 24px)", fontWeight: 700, textAlign: "center" as const, letterSpacing: 0 },
+    meta:  { fontSize: 11, textAlign: "center" as const, color: "#222", overflowWrap: "anywhere" as const },
+    hdBox: { borderBottom: "1.5px solid #111", marginTop: 12, marginBottom: 2, paddingBottom: 2 },
+    hdTxt: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" as const, color: "#111", fontFamily: "sans-serif" },
+    subRow:{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 7, marginBottom: 1, gap: 8 },
+    subL:  { fontSize: 12, color: "#111", margin: 0, flex: 1 },
+    subD:  { fontSize: 11, color: "#333", flexShrink: 0, fontStyle: "italic" as const },
+    bul:   { display: "flex", gap: 8, marginLeft: 14, fontSize: 11 },
+    bulD:  { color: "#111", flexShrink: 0, marginTop: 1 },
+    body:  { fontSize: 11, color: "#222", overflowWrap: "anywhere" as const },
+  };
+
   const renderContent = () => {
     switch (lt) {
       case "name":
-        return <p style={{ fontSize: "clamp(16px, 2.5vw, 20px)", fontWeight: 700, fontFamily: "'Times New Roman', Georgia, serif", textAlign: "center", overflowWrap: "anywhere" }}>{content}</p>;
+        return <p style={{ ...S.wrap, ...S.name }}>{content}</p>;
+
       case "heading":
-        return <div style={{ borderBottom: "1.5px solid #111", marginTop: 12, marginBottom: 2, paddingBottom: 2 }}><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "#111", fontFamily: "sans-serif" }}>{content}</span></div>;
+        return (
+          <div style={S.hdBox}>
+            <span style={S.hdTxt}>{content}</span>
+          </div>
+        );
+
       case "subheading": {
         let titlePart = diffLine.text;
         let datePart = "";
@@ -103,28 +124,42 @@ function DiffResumeLine({ diffLine, isFirst }: { diffLine: DiffLine; isFirst: bo
         }
         const pieces = titlePart.split("|");
         return (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6, marginBottom: 1, gap: 8 }}>
-            <p style={{ fontSize: 11, color: "#111", margin: 0 }}>
+          <div style={{ ...S.wrap, ...S.subRow }}>
+            <p style={S.subL}>
               <strong>{pieces[0].trim()}</strong>
               {pieces.length > 1 && <span style={{ fontWeight: 400 }}> | {pieces.slice(1).join(" | ").trim()}</span>}
             </p>
-            {datePart && <span style={{ fontSize: 10, color: "#333", flexShrink: 0, fontStyle: "italic" }}>{datePart}</span>}
+            {datePart && <span style={S.subD}>{datePart}</span>}
           </div>
         );
       }
+
       case "bullet":
-        return <div style={{ display: "flex", gap: 6, marginLeft: 12, fontSize: 11 }}><span style={{ color: "#111", flexShrink: 0 }}>•</span><span style={{ overflowWrap: "anywhere" }}>{content}</span></div>;
+        return (
+          <div style={{ ...S.wrap, ...S.bul }}>
+            <span style={S.bulD}>•</span>
+            <span style={{ overflowWrap: "anywhere" }}>{content}</span>
+          </div>
+        );
+
       case "meta":
-        return <p style={{ fontSize: 10, color: "#333", textAlign: "center", fontFamily: "sans-serif", overflowWrap: "anywhere" }}>{content}</p>;
+        return <p style={{ ...S.wrap, ...S.meta }}>{content}</p>;
+
       default: {
         if (diffLine.text.includes(":")) {
           const idx = diffLine.text.indexOf(":");
           const label = diffLine.text.slice(0, idx);
+          const rest  = diffLine.text.slice(idx + 1);
           if (label.length < 30) {
-            return <p style={{ fontSize: 11, overflowWrap: "anywhere" }}><strong>{label}:</strong><span>{content}</span></p>;
+            return (
+              <p style={{ ...S.wrap, ...S.body }}>
+                <strong>{label}:</strong>
+                <span>{content ? <>{rest.slice(0, 0)}{content}</> : rest}</span>
+              </p>
+            );
           }
         }
-        return <p style={{ fontSize: 11, overflowWrap: "anywhere" }}>{content}</p>;
+        return <p style={{ ...S.wrap, ...S.body }}>{content}</p>;
       }
     }
   };
