@@ -37,7 +37,10 @@ router.use((req, res, next) => {
   next();
 });
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
 
 // Helper to map Mongoose documents to API response format
 const mapResume = (doc: any) => ({
