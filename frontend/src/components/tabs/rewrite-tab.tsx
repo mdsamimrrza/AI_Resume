@@ -65,7 +65,7 @@ function ResumeDocument({ text }: { text: string }) {
               return (
                 <div key={i} style={S.bullet}>
                   <span style={S.bulletDot}>•</span>
-                  <span style={S.bulletText}>{line.text.replace(/^[-•*]\s*/, "")}</span>
+                  <span style={S.bulletText}>{line.text.replace(/^[-–•*]\s*/, "")}</span>
                 </div>
               );
             case "blank":

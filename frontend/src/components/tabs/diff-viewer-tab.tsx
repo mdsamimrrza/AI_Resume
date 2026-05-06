@@ -2,53 +2,48 @@ import { useGetDiff, getGetDiffQueryKey } from "@workspace/api-client-react";
 import { Loader2, SplitSquareHorizontal, Plus, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { classifyResumeLine, normalizeResumeText } from "@/lib/resume-format";
+import { classifyResumeLine, parseResume } from "@/lib/resume-format";
 
 interface DiffLine {
   text: string;
   lineType: "added" | "removed" | "equal";
+  lineClass: ReturnType<typeof classifyResumeLine>;
 }
 
 function buildDiffLines(originalText: string, rewrittenText: string): DiffLine[] {
-  const original = normalizeResumeText(originalText).split("\n").map((line) => line.trim());
-  const rewritten = normalizeResumeText(rewrittenText).split("\n").map((line) => line.trim());
+  // Use parseResume so we get the same structured/grouped lines as the Rewrite tab
+  const original  = parseResume(originalText).map(l => l.text);
+  const rewritten = parseResume(rewrittenText).map(l => l.text);
   const lines: DiffLine[] = [];
 
   let i = 0;
   let j = 0;
+  let isFirst = true;
+
+  const push = (text: string, lineType: DiffLine["lineType"]) => {
+    const lc = classifyResumeLine(text, isFirst);
+    if (text) isFirst = false;
+    lines.push({ text, lineType, lineClass: lc });
+  };
 
   while (i < original.length || j < rewritten.length) {
-    const left = original[i] ?? "";
+    const left  = original[i]  ?? "";
     const right = rewritten[j] ?? "";
 
     if (left === right) {
-      lines.push({ text: left, lineType: "equal" });
-      i += 1;
-      j += 1;
+      push(left, "equal"); i++; j++;
       continue;
     }
-
     if (right && original[i + 1] === right) {
-      lines.push({ text: left, lineType: "removed" });
-      i += 1;
+      push(left, "removed"); i++;
       continue;
     }
-
     if (left && rewritten[j + 1] === left) {
-      lines.push({ text: right, lineType: "added" });
-      j += 1;
+      push(right, "added"); j++;
       continue;
     }
-
-    if (left) {
-      lines.push({ text: left, lineType: "removed" });
-      i += 1;
-    }
-
-    if (right) {
-      lines.push({ text: right, lineType: "added" });
-      j += 1;
-    }
+    if (left) { push(left,  "removed"); i++; }
+    if (right) { push(right, "added");   j++; }
   }
 
   return lines;

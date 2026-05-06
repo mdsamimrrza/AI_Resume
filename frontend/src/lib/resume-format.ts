@@ -52,13 +52,18 @@ export function normalizeResumeText(text: string): string {
 
   // ── PHASE 1: inject \n before every section heading found anywhere in the blob ──
   for (const h of ALL_HEADINGS) {
-    // case-insensitive, whole-word, preceded by anything that is NOT a newline
     const escaped = h.replace(/\s+/g, "\\s+");
     t = t.replace(new RegExp(`(?<=[^\\n])(?=\\b${escaped}\\b)`, "gi"), "\n");
   }
 
-  // inject \n before bullet markers
-  t = t.replace(/ (?=[•*] |- (?=[A-Z]))/g, "\n");
+  // inject \n before bullet markers — catch ALL forms: '- ', '– ', '• ', '* '
+  // regardless of case of following word
+  t = t.replace(/([.!?]|\d{4})\s+([-–•*])\s+/g, "$1\n$2 ");
+  t = t.replace(/ (?=[•*] |[-–] [a-zA-Z])/g, "\n");
+
+  // split project title line: 'Title | Tech Jan 2024 Built...' -> 'Title | Tech Jan 2024\nBuilt...'
+  // detect a date followed immediately by body text
+  t = t.replace(/(\b(?:\d{4}|Present)\b)\s+([A-Z])/g, "$1\n$2");
 
   // inject \n between name and phone: "MD SAMIM REZA +91-..."
   t = t.replace(/^([A-Za-z][A-Za-z .,]{4,}?)\s+(\+?\d[\d\s\-]{7,})$/gm, "$1\n$2");
@@ -132,16 +137,16 @@ export function classifyResumeLine(text: string, isFirst: boolean): LineType {
   if (allCaps || isKnownHeading || t.startsWith("## ") || (t.startsWith("**") && t.endsWith("**") && !t.slice(2, -2).includes(" | "))) {
     return "heading";
   }
-  if (t.startsWith("- ") || t.startsWith("* ") || t.startsWith("• ")) return "bullet";
-  if (t.includes("|")) {
+  if (t.startsWith("- ") || t.startsWith("* ") || t.startsWith("• ") || t.startsWith("– ")) return "bullet";
+  if (t.includes("|") || (t.length < 100 && /^[A-Z]/.test(t) && !t.endsWith(".") && /\b\d{4}\b/.test(t))) {
+    // A line with pipe or a line that looks like a title with a date
+    if (/\b\d{4}\b/.test(t) || /\b(?:Present|current)\b/i.test(t)) return "subheading";
     const pipeCount = (t.match(/\|/g) || []).length;
     if (pipeCount <= 4 && t.length <= 200) return "subheading";
-    return "body";
   }
   if (CONTACT_RE.test(t) && t.length < 120) return "meta";
   if (/^\+?\d[\d\s\-()]{7,}$/.test(t)) return "meta"; // standalone phone
   if (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(t)) return "meta"; // standalone email
-  if (/[@()\\/]/.test(t) && t.length < 100) return "meta";
   return "body";
 }
 
@@ -151,19 +156,35 @@ export function parseResume(text: string): ParsedLine[] {
   let firstNonEmpty = true;
 
   const parsedLines: ParsedLine[] = [];
-  
+
   for (const line of rawLines) {
     const t = line.trim();
+
     if (!t) {
+      // Don't push blank yet — check if the last real line was meta.
+      // We'll buffer the blank and only add it if next line isn't meta.
       parsedLines.push({ type: "blank", text: "" });
       continue;
     }
+
     const type = classifyResumeLine(t, firstNonEmpty);
     if (firstNonEmpty) firstNonEmpty = false;
-    
-    // Group consecutive meta lines into a single line joined by |
-    if (type === "meta" && parsedLines.length > 0 && parsedLines[parsedLines.length - 1].type === "meta") {
-      parsedLines[parsedLines.length - 1].text += ` | ${t}`;
+
+    if (type === "meta") {
+      // Find the last non-blank entry
+      let lastNonBlank = parsedLines.length - 1;
+      while (lastNonBlank >= 0 && parsedLines[lastNonBlank].type === "blank") {
+        lastNonBlank--;
+      }
+
+      if (lastNonBlank >= 0 && parsedLines[lastNonBlank].type === "meta") {
+        // Remove the blank lines between the two meta items
+        while (parsedLines.length > lastNonBlank + 1) parsedLines.pop();
+        // Append to existing meta line
+        parsedLines[lastNonBlank].text += ` | ${t}`;
+      } else {
+        parsedLines.push({ type, text: t });
+      }
     } else {
       parsedLines.push({ type, text: t });
     }
