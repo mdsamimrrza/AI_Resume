@@ -3,8 +3,23 @@ import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
+import { connectDB } from "@workspace/db";
 
 const app = express();
+
+// Middleware to ensure DB connection
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err: any) {
+    logger.error("DB Connection Middleware Error:", err);
+    res.status(503).json({ 
+      error: "Database connection failed", 
+      details: err.message 
+    });
+  }
+});
 
 app.use(
   pinoHttp({
