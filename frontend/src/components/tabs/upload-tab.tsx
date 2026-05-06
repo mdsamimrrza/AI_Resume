@@ -9,12 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
-type UploadFormValues = {
-  rawText?: string;
-  jobDescription: string;
-  jobTitle?: string;
-  company?: string;
-};
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const uploadSchema = z.object({
+  rawText: z.string().optional(),
+  jobDescription: z.string().min(50, "Job description must be at least 50 characters"),
+  jobTitle: z.string().optional(),
+  company: z.string().optional(),
+});
+
+type UploadFormValues = z.infer<typeof uploadSchema>;
 
 export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) => void }) {
   const [file, setFile] = useState<File | null>(null);
@@ -22,6 +27,7 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<UploadFormValues>({
+    resolver: zodResolver(uploadSchema),
     defaultValues: {
       rawText: "",
       jobDescription: "",
@@ -38,18 +44,9 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
     form.clearErrors();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onFormSubmit = async (values: UploadFormValues) => {
     setError(null);
-
-    const values = form.getValues();
     const jobDescription = (values.jobDescription || "").trim();
-
-    // Validate job description
-    if (jobDescription.length < 50) {
-      form.setError("jobDescription", { message: "Job description must be at least 50 characters" });
-      return;
-    }
 
     // Validate resume source
     if (!file && (!values.rawText || values.rawText.trim().length < 10)) {
@@ -80,7 +77,9 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
         onUploadSuccess(String(res.id));
       } catch (err: any) {
         console.error("PDF upload error:", err);
-        setError(err.message || "Something went wrong uploading the PDF. Please try again.");
+        setError(err.message === "Failed to fetch" 
+          ? "Network error: Connection to server failed. Please check your internet and try again."
+          : err.message || "Something went wrong uploading the PDF.");
         setIsUploading(false);
       }
     } else {
@@ -120,7 +119,7 @@ export function UploadTab({ onUploadSuccess }: { onUploadSuccess: (id: string) =
       )}
 
       <Form {...form}>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onFormSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <Label className="text-sm font-semibold">Your Resume</Label>
